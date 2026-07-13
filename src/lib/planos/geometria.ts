@@ -54,7 +54,9 @@ export function transformTaca(
 }
 
 /** Transform para una taca DE ESQUINA: pegada a la esquina indicada. Las esquinas
- *  derechas llevan espejo horizontal para que la forma abra hacia el vidrio. */
+ *  derechas llevan espejo horizontal para que la forma abra hacia el vidrio.
+ *  Por defecto la taca va VOLTEADA para que su espacio abierto dé a la esquina;
+ *  el flag `voltear` la devuelve al derecho si un herraje lo pide. */
 export function transformTacaEsquina(
   t: DefTaca,
   esq: Esquina,
@@ -73,7 +75,7 @@ export function transformTacaEsquina(
           : `matrix(-1,0,0,-1,${W},${H})`;
   const partes = [base];
   if (escala !== 1) partes.push(`matrix(${escala},0,0,${escala},0,0)`);
-  if (voltear) partes.push(matVoltear(t));
+  if (!voltear) partes.push(matVoltear(t));
   partes.push(matNativoACanonico(t));
   return partes.join(" ");
 }
