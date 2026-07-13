@@ -621,17 +621,17 @@ export default function PlanosPage() {
             <PiezaSVG pieza={pieza} sel={null} forPrint />
           </div>
           <div className="flex-1">
-            <h2 className="mb-2 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-[#6a6a60]">Medidas</h2>
+            <h2 className="mb-3 font-display text-[15px] font-bold uppercase tracking-[0.1em] text-[#6a6a60]">Medidas</h2>
             {elementos.length === 0 ? (
-              <p className="text-[11px] italic text-[#8a8a80]">Sin elementos.</p>
+              <p className="text-[14px] italic text-[#8a8a80]">Sin elementos.</p>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 {elementos.map((e, i) => (
-                  <div key={e.id} className="flex items-start gap-2 border-b border-[#eee] pb-2 text-[11px]">
-                    <NumBadge n={i + 1} />
-                    <div className="min-w-0">
-                      <b className="block">{nombreTipo(e)}</b>
-                      <span className="tabular text-[#6a6a60]">{subTipo(e)}</span>
+                  <div key={e.id} className="flex items-start gap-3 border-b border-[#e3e3da] pb-3">
+                    <NumBadge n={i + 1} size={30} />
+                    <div className="min-w-0 pt-0.5">
+                      <b className="block text-[16px] font-semibold leading-tight">{nombreTipo(e)}</b>
+                      <span className="tabular text-[14px] text-[#6a6a60]">{subTipo(e)}</span>
                     </div>
                   </div>
                 ))}
@@ -645,9 +645,12 @@ export default function PlanosPage() {
 }
 
 // ---- mini componentes de UI (locales) ----
-function NumBadge({ n }: { n: number }) {
+function NumBadge({ n, size = 18 }: { n: number; size?: number }) {
   return (
-    <span className="inline-flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-oro text-[11px] font-bold text-white">
+    <span
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.52) }}
+      className="inline-flex flex-none items-center justify-center rounded-full bg-oro font-bold text-white"
+    >
       {n}
     </span>
   );
