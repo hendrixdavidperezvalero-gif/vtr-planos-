@@ -54,13 +54,20 @@ const EJEMPLO: Elemento[] = [
   { id: 6, tipo: "perforacion", dia: 8, x: 65, y: 200 },
 ];
 
+// Factor de agrandado visual de una taca (referencia para los perforadores, no
+// proporcional): garantiza un ancho dibujado mínimo relativo a la pieza.
+function boostTaca(anchoReal: number, m: number): number {
+  return Math.max(1, (m * 0.09) / anchoReal);
+}
+
 // Punto ancla de la marca numerada de un elemento (en cm de pieza).
-function markerAnchor(e: Elemento, W: number, H: number, off: number): [number, number] {
+function markerAnchor(e: Elemento, W: number, H: number, off: number, m: number): [number, number] {
   if (e.tipo === "perforacion") {
     // etiqueta desplazada arriba-derecha del símbolo, sin salirse de la pieza
     return [Math.min(W - off, e.x + off * 1.4), Math.min(H - off, e.y + off * 1.4)];
   }
-  const centro = e.dist + TACAS[e.clave].ancho / 2;
+  const anchoVis = TACAS[e.clave].ancho * boostTaca(TACAS[e.clave].ancho, m);
+  const centro = e.dist + anchoVis / 2;
   switch (e.borde) {
     case "inf":
       return [centro, off];
@@ -196,7 +203,7 @@ function PiezaSVG({
               key={e.id}
               className={cx("pl-el", s && "sel")}
               onClick={() => onSelect?.(e.id)}
-              transform={transformTaca(def, e.borde, e.dist, e.voltear, W, H)}
+              transform={transformTaca(def, e.borde, e.dist, e.voltear, W, H, boostTaca(def.ancho, m))}
             >
               <TacaPrims clave={e.clave} />
             </g>
@@ -322,7 +329,7 @@ function PiezaSVG({
 
       {/* marcas numeradas pequeñas (referencia, ligadas a la leyenda de medidas) */}
       {pieza.elementos.map((e, i) => {
-        const [ax, ay] = markerAnchor(e, W, H, off);
+        const [ax, ay] = markerAnchor(e, W, H, off, m);
         const [sx, sy] = map(ax, ay);
         return (
           <g key={"m" + e.id}>

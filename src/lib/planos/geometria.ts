@@ -34,7 +34,9 @@ export function matBorde(borde: Borde, dist: number, W: number, H: number): stri
   }
 }
 
-/** Transform SVG completo para colocar una taca (todo en espacio de pieza cm). */
+/** Transform SVG completo para colocar una taca (todo en espacio de pieza cm).
+ *  `escala` agranda el dibujo SOLO como referencia visual (anclado al inicio de
+ *  la taca, así la cota de inicio sigue siendo cierta aunque no sea proporcional). */
 export function transformTaca(
   t: DefTaca,
   borde: Borde,
@@ -42,8 +44,10 @@ export function transformTaca(
   voltear: boolean,
   W: number,
   H: number,
+  escala = 1,
 ): string {
   const partes = [matBorde(borde, dist, W, H)];
+  if (escala !== 1) partes.push(`matrix(${escala},0,0,${escala},0,0)`);
   if (voltear) partes.push(matVoltear(t));
   partes.push(matNativoACanonico(t));
   return partes.join(" ");
