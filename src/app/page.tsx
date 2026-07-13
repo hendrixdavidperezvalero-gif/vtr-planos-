@@ -292,7 +292,9 @@ function PiezaSVG({
         );
       })}
 
-      {/* distancias entre tacas del mismo borde (inicio a inicio) */}
+      {/* distancias entre tacas del mismo borde: la más corta (fin de una → inicio
+          de la siguiente). La etiqueta usa el ancho REAL de la taca, aunque el
+          dibujo esté agrandado como referencia. */}
       {(["inf", "sup", "izq", "der"] as Borde[]).map((bd) => {
         const ts = (pieza.elementos.filter((e) => e.tipo === "taca" && !e.esquina && e.borde === bd) as Taca[])
           .slice()
@@ -302,9 +304,11 @@ function PiezaSVG({
           bd === "inf" ? [t, ins] : bd === "sup" ? [t, H - ins] : bd === "izq" ? [ins, t] : [W - ins, t];
         return ts.slice(1).map((b, idx) => {
           const a = ts[idx];
-          const d = Math.round((b.dist - a.dist) * 10) / 10;
+          const defA = TACAS[a.clave];
+          const d = Math.round((b.dist - (a.dist + defA.ancho)) * 10) / 10; // hueco real
           if (d <= 0) return null;
-          const [ax, ay] = map(...p(a.dist));
+          const finVisA = a.dist + defA.ancho * boostTaca(defA.ancho, m); // fin dibujado
+          const [ax, ay] = map(...p(Math.min(finVisA, b.dist)));
           const [bx, by] = map(...p(b.dist));
           const mx = (ax + bx) / 2,
             my = (ay + by) / 2;
