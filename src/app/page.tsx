@@ -20,11 +20,11 @@ import { transformTaca, cotaTaca } from "@/lib/planos/geometria";
 // colores literales, sin var() porque el PNG se rinde aislado del documento).
 const PLANO_CSS = `
 text{font-family:Inter,system-ui,sans-serif}
-.pl-vidrio{fill:#e7efe9;stroke:#6e9484}
-.pl-grid{stroke:#cdd9d1;fill:none}
-.pl-hole{fill:#ffffff;stroke:#2f2c26}
-.pl-taca{fill:#ffffff;stroke:#2f2c26}
-.pl-taca-linea{fill:none;stroke:#2f2c26}
+.pl-vidrio{fill:#e6efe9;stroke:#5f8574}
+.pl-grid{stroke:#d5e0d9;fill:none}
+.pl-hole{fill:#ffffff;stroke:#231f19}
+.pl-taca{fill:#ffffff;stroke:#231f19}
+.pl-taca-linea{fill:none;stroke:#231f19}
 .pl-el{cursor:pointer}
 .pl-el.sel .pl-hole,.pl-el.sel .pl-taca,.pl-el.sel .pl-taca-linea{stroke:#c8982e}
 .pl-dim{stroke:#c8982e;fill:none}
@@ -80,14 +80,14 @@ function TacaPrims({ clave }: { clave: TacaClave }) {
               d={p.d}
               fillRule={p.evenodd ? "evenodd" : undefined}
               vectorEffect="non-scaling-stroke"
-              strokeWidth={1.4}
+              strokeWidth={1.9}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           );
         if (p.t === "circle")
           return (
-            <circle key={i} className="pl-taca" cx={p.cx} cy={p.cy} r={p.r} vectorEffect="non-scaling-stroke" strokeWidth={1.4} />
+            <circle key={i} className="pl-taca" cx={p.cx} cy={p.cy} r={p.r} vectorEffect="non-scaling-stroke" strokeWidth={1.9} />
           );
         return (
           <rect
@@ -99,7 +99,7 @@ function TacaPrims({ clave }: { clave: TacaClave }) {
             height={p.h}
             rx={p.rx}
             vectorEffect="non-scaling-stroke"
-            strokeWidth={1.4}
+            strokeWidth={1.9}
           />
         );
       })}
@@ -135,7 +135,7 @@ function PiezaSVG({
     fsLabel = m * 0.022,
     fsDim = m * 0.022;
   const S = S0 * zoom;
-  const badgeR = m * 0.02; // radio de la marca numerada (referencia, no a escala)
+  const badgeR = m * 0.023; // radio de la marca numerada (referencia, no a escala)
   const off = badgeR * 1.8;
   const map = (x: number, y: number): [number, number] => [x, H - y];
 
@@ -160,12 +160,12 @@ function PiezaSVG({
 
       {/* geometría en cm, y hacia arriba (origen esquina inferior izquierda) */}
       <g transform={`translate(0,${H}) scale(1,-1)`}>
-        <rect className="pl-vidrio" x={0} y={0} width={W} height={H} vectorEffect="non-scaling-stroke" strokeWidth={2} />
+        <rect className="pl-vidrio" x={0} y={0} width={W} height={H} rx={Math.max(0.3, m * 0.006)} vectorEffect="non-scaling-stroke" strokeWidth={2.5} />
         {xs.slice(1, -1).map((t) => (
-          <line key={"gx" + t} className="pl-grid" x1={t} y1={0} x2={t} y2={H} vectorEffect="non-scaling-stroke" strokeWidth={1} />
+          <line key={"gx" + t} className="pl-grid" x1={t} y1={0} x2={t} y2={H} vectorEffect="non-scaling-stroke" strokeWidth={0.8} />
         ))}
         {ys.slice(1, -1).map((t) => (
-          <line key={"gy" + t} className="pl-grid" x1={0} y1={t} x2={W} y2={t} vectorEffect="non-scaling-stroke" strokeWidth={1} />
+          <line key={"gy" + t} className="pl-grid" x1={0} y1={t} x2={W} y2={t} vectorEffect="non-scaling-stroke" strokeWidth={0.8} />
         ))}
 
         {pieza.elementos.map((e) => {
@@ -173,7 +173,7 @@ function PiezaSVG({
           if (e.tipo === "perforacion") {
             return (
               <g key={e.id} className={cx("pl-el", s && "sel")} onClick={() => onSelect?.(e.id)}>
-                <circle className="pl-hole" cx={e.x} cy={e.y} r={e.dia / 20} vectorEffect="non-scaling-stroke" strokeWidth={1.5} />
+                <circle className="pl-hole" cx={e.x} cy={e.y} r={e.dia / 20} vectorEffect="non-scaling-stroke" strokeWidth={2} />
               </g>
             );
           }
@@ -248,8 +248,8 @@ function PiezaSVG({
         const [sx, sy] = map(ax, ay);
         return (
           <g key={"m" + e.id}>
-            <circle className="pl-marca" cx={sx} cy={sy} r={badgeR} vectorEffect="non-scaling-stroke" strokeWidth={1.5} />
-            <text className="pl-marcatxt" x={sx} y={sy} textAnchor="middle" dominantBaseline="central" fontSize={badgeR * 1.25}>
+            <circle className="pl-marca" cx={sx} cy={sy} r={badgeR} vectorEffect="non-scaling-stroke" strokeWidth={2} />
+            <text className="pl-marcatxt" x={sx} y={sy} textAnchor="middle" dominantBaseline="central" fontSize={badgeR * 1.3}>
               {i + 1}
             </text>
           </g>
@@ -621,17 +621,17 @@ export default function PlanosPage() {
             <PiezaSVG pieza={pieza} sel={null} forPrint />
           </div>
           <div className="flex-1">
-            <h2 className="mb-3 font-display text-[15px] font-bold uppercase tracking-[0.1em] text-[#6a6a60]">Medidas</h2>
+            <h2 className="mb-4 font-display text-[18px] font-bold uppercase tracking-[0.08em] text-[#4a463f]">Medidas</h2>
             {elementos.length === 0 ? (
-              <p className="text-[14px] italic text-[#8a8a80]">Sin elementos.</p>
+              <p className="text-[16px] italic text-[#8a8a80]">Sin elementos.</p>
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 {elementos.map((e, i) => (
-                  <div key={e.id} className="flex items-start gap-3 border-b border-[#e3e3da] pb-3">
-                    <NumBadge n={i + 1} size={30} />
+                  <div key={e.id} className="flex items-start gap-3 border-b border-[#e3e3da] pb-4">
+                    <NumBadge n={i + 1} size={36} />
                     <div className="min-w-0 pt-0.5">
-                      <b className="block text-[16px] font-semibold leading-tight">{nombreTipo(e)}</b>
-                      <span className="tabular text-[14px] text-[#6a6a60]">{subTipo(e)}</span>
+                      <b className="block text-[19px] font-bold leading-tight">{nombreTipo(e)}</b>
+                      <span className="tabular text-[16px] text-[#5a564e]">{subTipo(e)}</span>
                     </div>
                   </div>
                 ))}
