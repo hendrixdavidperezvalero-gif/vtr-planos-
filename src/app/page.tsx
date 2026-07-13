@@ -12,7 +12,7 @@
 import { useRef, useState } from "react";
 import { cx, Logo, Btn } from "@/components/ui";
 import { DIAMETROS, BORDES } from "@/lib/planos/modelo";
-import type { Borde, Elemento, Perforacion, Pieza, TacaClave } from "@/lib/planos/modelo";
+import type { Borde, Elemento, Perforacion, Pieza, Taca, TacaClave } from "@/lib/planos/modelo";
 import { TACAS, TACAS_LISTA } from "@/lib/planos/tacas";
 import { transformTaca, cotaTaca } from "@/lib/planos/geometria";
 
@@ -35,7 +35,7 @@ text{font-family:Inter,system-ui,sans-serif}
 .pl-axis{fill:#6a6a60}
 .pl-origin{fill:#c8982e}
 .pl-otxt{fill:#c8982e;font-weight:700}
-.pl-marca{fill:#c8982e;stroke:#ffffff}
+.pl-marca{fill:#c8982e;stroke:#ffffff;fill-opacity:.85}
 .pl-marcatxt{fill:#ffffff;font-weight:800}
 `;
 
@@ -142,7 +142,7 @@ function PiezaSVG({
     fsLabel = m * 0.022,
     fsDim = m * 0.022;
   const S = S0 * zoom;
-  const badgeR = m * 0.023; // radio de la marca numerada (referencia, no a escala)
+  const badgeR = m * 0.012; // radio de la marca numerada (pequeña, no debe estorbar)
   const off = badgeR * 1.8;
   const Rp = m * 0.016; // radio del símbolo de perforación (referencia, no a escala)
   const map = (x: number, y: number): [number, number] => [x, H - y];
@@ -281,7 +281,46 @@ function PiezaSVG({
         );
       })}
 
-      {/* marcas numeradas grandes (referencia, ligadas a la leyenda de medidas) */}
+      {/* distancias entre tacas del mismo borde (inicio a inicio) */}
+      {(["inf", "sup", "izq", "der"] as Borde[]).map((bd) => {
+        const ts = (pieza.elementos.filter((e) => e.tipo === "taca" && e.borde === bd) as Taca[])
+          .slice()
+          .sort((a, b) => a.dist - b.dist);
+        const ins = m * 0.05; // separación de la línea de cota respecto al borde
+        const p = (t: number): [number, number] =>
+          bd === "inf" ? [t, ins] : bd === "sup" ? [t, H - ins] : bd === "izq" ? [ins, t] : [W - ins, t];
+        return ts.slice(1).map((b, idx) => {
+          const a = ts[idx];
+          const d = Math.round((b.dist - a.dist) * 10) / 10;
+          if (d <= 0) return null;
+          const [ax, ay] = map(...p(a.dist));
+          const [bx, by] = map(...p(b.dist));
+          const mx = (ax + bx) / 2,
+            my = (ay + by) / 2;
+          const vertical = bd === "izq" || bd === "der";
+          return (
+            <g key={"td" + a.id + "-" + b.id}>
+              <line className="pl-dim2" x1={ax} y1={ay} x2={bx} y2={by} vectorEffect="non-scaling-stroke" strokeWidth={1.6} strokeDasharray="4 3" />
+              <text
+                className="pl-dim2txt"
+                transform={vertical ? `translate(${mx - fsDim * 0.35}, ${my}) rotate(-90)` : undefined}
+                x={vertical ? undefined : mx}
+                y={vertical ? undefined : my - fsDim * 0.3}
+                textAnchor="middle"
+                fontSize={fsDim * 0.95}
+                stroke="#ffffff"
+                strokeWidth={fsDim * 0.18}
+                paintOrder="stroke"
+                strokeLinejoin="round"
+              >
+                {fmt(d)}
+              </text>
+            </g>
+          );
+        });
+      })}
+
+      {/* marcas numeradas pequeñas (referencia, ligadas a la leyenda de medidas) */}
       {pieza.elementos.map((e, i) => {
         const [ax, ay] = markerAnchor(e, W, H, off);
         const [sx, sy] = map(ax, ay);
