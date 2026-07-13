@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/* Identidad visual VTR — mismos tokens que belen-web (VTR es geométrico:
+   radios casi cero (máx 4px), negro + oro, alto contraste de taller). */
+@theme {
+  /* superficies */
+  --color-negro: #1a1a1a;
+  --color-negro-2: #0f0f0f;
+  --color-carbon: #161616;
+  --color-carbon-2: #242424;
+  /* marca */
+  --color-oro: #c8982e;
+  --color-oro-dark: #9d7a1f;
+  --color-blanco: #ffffff;
+  /* neutros */
+  --color-gris: #333333;
+  --color-gris-mid: #666666;
+  /* estados */
+  --color-espera: #e5b23b;
+  --color-proceso: #4fbf7f;
+  --color-pausa: #e36a54;
+  /* tipografía */
+  --font-display: var(--font-montserrat);
+  --font-sans: var(--font-inter);
+  /* radios geométricos VTR */
+  --radius-vtr: 4px;
+}
+
+body {
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-montserrat), var(--font-inter), sans-serif;
+}
+
+/* números tabulares donde hay cifras */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
