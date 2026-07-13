@@ -32,6 +32,8 @@ text{font-family:Inter,system-ui,sans-serif}
 .pl-axis{fill:#6a6a60}
 .pl-origin{fill:#c8982e}
 .pl-otxt{fill:#c8982e;font-weight:700}
+.pl-marca{fill:#c8982e;stroke:#ffffff}
+.pl-marcatxt{fill:#ffffff;font-weight:800}
 `;
 
 const S0 = 3.2; // px por cm base (se multiplica por el zoom)
@@ -47,6 +49,22 @@ const EJEMPLO: Elemento[] = [
   { id: 4, tipo: "taca", clave: "con_freno", borde: "inf", dist: 0, voltear: false },
   { id: 5, tipo: "perforacion", dia: 10, x: 45, y: 205 },
 ];
+
+// Punto ancla de la marca numerada de un elemento (en cm de pieza).
+function markerAnchor(e: Elemento, W: number, H: number, off: number): [number, number] {
+  if (e.tipo === "perforacion") return [e.x, e.y];
+  const centro = e.dist + TACAS[e.clave].ancho / 2;
+  switch (e.borde) {
+    case "inf":
+      return [centro, off];
+    case "sup":
+      return [centro, H - off];
+    case "izq":
+      return [off, centro];
+    case "der":
+      return [W - off, centro];
+  }
+}
 
 // ---- Trazos de una taca (coords nativas) ----
 function TacaPrims({ clave }: { clave: TacaClave }) {
@@ -117,6 +135,8 @@ function PiezaSVG({
     fsLabel = m * 0.022,
     fsDim = m * 0.022;
   const S = S0 * zoom;
+  const badgeR = m * 0.02; // radio de la marca numerada (referencia, no a escala)
+  const off = badgeR * 1.8;
   const map = (x: number, y: number): [number, number] => [x, H - y];
 
   // marcas de eje
@@ -221,6 +241,20 @@ function PiezaSVG({
 
       {/* cotas del elemento seleccionado */}
       {selEl && <Cotas el={selEl} W={W} H={H} fs={fsDim} map={map} />}
+
+      {/* marcas numeradas grandes (referencia, ligadas a la leyenda de medidas) */}
+      {pieza.elementos.map((e, i) => {
+        const [ax, ay] = markerAnchor(e, W, H, off);
+        const [sx, sy] = map(ax, ay);
+        return (
+          <g key={"m" + e.id}>
+            <circle className="pl-marca" cx={sx} cy={sy} r={badgeR} vectorEffect="non-scaling-stroke" strokeWidth={1.5} />
+            <text className="pl-marcatxt" x={sx} y={sy} textAnchor="middle" dominantBaseline="central" fontSize={badgeR * 1.25}>
+              {i + 1}
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }
@@ -498,7 +532,7 @@ export default function PlanosPage() {
                 {elementos.length === 0 && (
                   <p className="text-[12px] italic text-[#8a8a80]">Sin elementos. Agrega uno o carga el ejemplo.</p>
                 )}
-                {elementos.map((e) => (
+                {elementos.map((e, i) => (
                   <div
                     key={e.id}
                     onClick={() => setSel(e.id)}
@@ -507,6 +541,7 @@ export default function PlanosPage() {
                       sel === e.id ? "border-oro shadow-[inset_0_0_0_1px_var(--color-oro)]" : "border-[#e3e3da]",
                     )}
                   >
+                    <NumBadge n={i + 1} />
                     <div className="min-w-0 flex-1">
                       <b className="block truncate text-[12.5px] font-semibold">{nombreTipo(e)}</b>
                       <span className="tabular text-[10.5px] text-[#8a8a80]">{subTipo(e)}</span>
@@ -580,36 +615,43 @@ export default function PlanosPage() {
           </table>
         </div>
 
-        <div className="mx-auto max-w-[560px]">
-          <PiezaSVG pieza={pieza} sel={null} forPrint />
+        {/* plano a la izquierda, medidas a la derecha — todo en la primera hoja */}
+        <div className="flex break-inside-avoid gap-5">
+          <div className="w-[57%] flex-none">
+            <PiezaSVG pieza={pieza} sel={null} forPrint />
+          </div>
+          <div className="flex-1">
+            <h2 className="mb-2 font-display text-[11px] font-bold uppercase tracking-[0.12em] text-[#6a6a60]">Medidas</h2>
+            {elementos.length === 0 ? (
+              <p className="text-[11px] italic text-[#8a8a80]">Sin elementos.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {elementos.map((e, i) => (
+                  <div key={e.id} className="flex items-start gap-2 border-b border-[#eee] pb-2 text-[11px]">
+                    <NumBadge n={i + 1} />
+                    <div className="min-w-0">
+                      <b className="block">{nombreTipo(e)}</b>
+                      <span className="tabular text-[#6a6a60]">{subTipo(e)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-
-        {elementos.length > 0 && (
-          <table className="mt-5 w-full border-collapse text-[11px]">
-            <thead>
-              <tr className="border-b border-[#d8d8cf] text-left text-[#6a6a60]">
-                <th className="py-1 pr-2">#</th>
-                <th className="py-1 pr-2">Elemento</th>
-                <th className="py-1 pr-2">Ubicación</th>
-              </tr>
-            </thead>
-            <tbody>
-              {elementos.map((e, i) => (
-                <tr key={e.id} className="border-b border-[#eee]">
-                  <td className="tabular py-1 pr-2">{i + 1}</td>
-                  <td className="py-1 pr-2">{nombreTipo(e)}</td>
-                  <td className="tabular py-1 pr-2">{subTipo(e)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </div>
     </div>
   );
 }
 
 // ---- mini componentes de UI (locales) ----
+function NumBadge({ n }: { n: number }) {
+  return (
+    <span className="inline-flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-oro text-[11px] font-bold text-white">
+      {n}
+    </span>
+  );
+}
 function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <section className="rounded-[4px] border border-[#d8d8cf] bg-[#eaeae4] p-3.5">
