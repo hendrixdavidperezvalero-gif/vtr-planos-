@@ -12,7 +12,7 @@
 import { useRef, useState } from "react";
 import { cx, Logo, Btn } from "@/components/ui";
 import { DIAMETROS, BORDES } from "@/lib/planos/modelo";
-import type { Borde, Elemento, Pieza, TacaClave } from "@/lib/planos/modelo";
+import type { Borde, Elemento, Perforacion, Pieza, TacaClave } from "@/lib/planos/modelo";
 import { TACAS, TACAS_LISTA } from "@/lib/planos/tacas";
 import { transformTaca, cotaTaca } from "@/lib/planos/geometria";
 
@@ -25,9 +25,12 @@ text{font-family:Inter,system-ui,sans-serif}
 .pl-hole{fill:#ffffff;stroke:#231f19}
 .pl-taca{fill:#ffffff;stroke:#231f19}
 .pl-taca-linea{fill:none;stroke:#231f19}
+.pl-cross{stroke:#231f19}
 .pl-el{cursor:pointer}
-.pl-el.sel .pl-hole,.pl-el.sel .pl-taca,.pl-el.sel .pl-taca-linea{stroke:#c8982e}
+.pl-el.sel .pl-hole,.pl-el.sel .pl-taca,.pl-el.sel .pl-taca-linea,.pl-el.sel .pl-cross{stroke:#c8982e}
 .pl-dim{stroke:#c8982e;fill:none}
+.pl-dim2{stroke:#37627a;fill:none}
+.pl-dim2txt{fill:#37627a;font-weight:700}
 .pl-dimtxt{fill:#c8982e;font-weight:700}
 .pl-axis{fill:#6a6a60}
 .pl-origin{fill:#c8982e}
@@ -47,12 +50,16 @@ const EJEMPLO: Elemento[] = [
   { id: 2, tipo: "taca", clave: "bisagra", borde: "izq", dist: 180, voltear: false },
   { id: 3, tipo: "taca", clave: "cerradura", borde: "der", dist: 100, voltear: false },
   { id: 4, tipo: "taca", clave: "con_freno", borde: "inf", dist: 0, voltear: false },
-  { id: 5, tipo: "perforacion", dia: 10, x: 45, y: 205 },
+  { id: 5, tipo: "perforacion", dia: 10, x: 25, y: 200 },
+  { id: 6, tipo: "perforacion", dia: 8, x: 65, y: 200 },
 ];
 
 // Punto ancla de la marca numerada de un elemento (en cm de pieza).
 function markerAnchor(e: Elemento, W: number, H: number, off: number): [number, number] {
-  if (e.tipo === "perforacion") return [e.x, e.y];
+  if (e.tipo === "perforacion") {
+    // etiqueta desplazada arriba-derecha del símbolo, sin salirse de la pieza
+    return [Math.min(W - off, e.x + off * 1.4), Math.min(H - off, e.y + off * 1.4)];
+  }
   const centro = e.dist + TACAS[e.clave].ancho / 2;
   switch (e.borde) {
     case "inf":
@@ -137,6 +144,7 @@ function PiezaSVG({
   const S = S0 * zoom;
   const badgeR = m * 0.023; // radio de la marca numerada (referencia, no a escala)
   const off = badgeR * 1.8;
+  const Rp = m * 0.016; // radio del símbolo de perforación (referencia, no a escala)
   const map = (x: number, y: number): [number, number] => [x, H - y];
 
   // marcas de eje
@@ -146,6 +154,9 @@ function PiezaSVG({
   for (let t = 0; t <= H + 0.001; t += paso) ys.push(+t.toFixed(3));
 
   const selEl = pieza.elementos.find((e) => e.id === sel);
+  const perfs = (pieza.elementos.filter((e) => e.tipo === "perforacion") as Perforacion[])
+    .slice()
+    .sort((a, b) => a.x - b.x || a.y - b.y);
 
   return (
     <svg
@@ -173,7 +184,9 @@ function PiezaSVG({
           if (e.tipo === "perforacion") {
             return (
               <g key={e.id} className={cx("pl-el", s && "sel")} onClick={() => onSelect?.(e.id)}>
-                <circle className="pl-hole" cx={e.x} cy={e.y} r={e.dia / 20} vectorEffect="non-scaling-stroke" strokeWidth={2} />
+                <circle className="pl-hole" cx={e.x} cy={e.y} r={Rp} vectorEffect="non-scaling-stroke" strokeWidth={2} />
+                <line className="pl-cross" x1={e.x - Rp * 1.55} y1={e.y} x2={e.x + Rp * 1.55} y2={e.y} vectorEffect="non-scaling-stroke" strokeWidth={1.5} />
+                <line className="pl-cross" x1={e.x} y1={e.y - Rp * 1.55} x2={e.x} y2={e.y + Rp * 1.55} vectorEffect="non-scaling-stroke" strokeWidth={1.5} />
               </g>
             );
           }
@@ -241,6 +254,32 @@ function PiezaSVG({
 
       {/* cotas del elemento seleccionado */}
       {selEl && <Cotas el={selEl} W={W} H={H} fs={fsDim} map={map} />}
+
+      {/* distancias entre perforaciones (punto a punto, centro a centro) */}
+      {perfs.slice(1).map((b, idx) => {
+        const a = perfs[idx];
+        const [ax, ay] = map(a.x, a.y);
+        const [bx, by] = map(b.x, b.y);
+        const d = Math.round(Math.hypot(a.x - b.x, a.y - b.y) * 10) / 10;
+        return (
+          <g key={"pd" + a.id + "-" + b.id}>
+            <line className="pl-dim2" x1={ax} y1={ay} x2={bx} y2={by} vectorEffect="non-scaling-stroke" strokeWidth={1.6} strokeDasharray="4 3" />
+            <text
+              className="pl-dim2txt"
+              x={(ax + bx) / 2}
+              y={(ay + by) / 2 - fsDim * 0.3}
+              textAnchor="middle"
+              fontSize={fsDim * 0.95}
+              stroke="#ffffff"
+              strokeWidth={fsDim * 0.18}
+              paintOrder="stroke"
+              strokeLinejoin="round"
+            >
+              {fmt(d)}
+            </text>
+          </g>
+        );
+      })}
 
       {/* marcas numeradas grandes (referencia, ligadas a la leyenda de medidas) */}
       {pieza.elementos.map((e, i) => {
