@@ -28,7 +28,7 @@ export const TACAS: Record<TacaClave, DefTaca> = {
     nombre: "Taca todo visión",
     ancho: 3.0,
     nvb: [555, 160],
-    esquina: false,
+    esquina: true,
     prims: [
       { t: "path", linea: true, d: "M 0,40 C 120,44 250,45 345,49 L 410,92 L 468,158" },
       { t: "circle", cx: 524.5, cy: 30.5, r: 30.5 },

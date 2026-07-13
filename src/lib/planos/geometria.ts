@@ -7,7 +7,7 @@
 // Canónico = borde del vidrio en y=0, la taca entra hacia +y. La pieza se dibuja en
 // cm con y hacia arriba (origen esquina inferior izquierda).
 
-import type { Borde, DefTaca } from "./modelo";
+import type { Borde, DefTaca, Esquina } from "./modelo";
 
 /** Nativo (px, y hacia abajo) → canónico (cm, borde en y=0, entra hacia +y). */
 export function matNativoACanonico(t: DefTaca): string {
@@ -47,6 +47,31 @@ export function transformTaca(
   escala = 1,
 ): string {
   const partes = [matBorde(borde, dist, W, H)];
+  if (escala !== 1) partes.push(`matrix(${escala},0,0,${escala},0,0)`);
+  if (voltear) partes.push(matVoltear(t));
+  partes.push(matNativoACanonico(t));
+  return partes.join(" ");
+}
+
+/** Transform para una taca DE ESQUINA: pegada a la esquina indicada. Las esquinas
+ *  derechas llevan espejo horizontal para que la forma abra hacia el vidrio. */
+export function transformTacaEsquina(
+  t: DefTaca,
+  esq: Esquina,
+  W: number,
+  H: number,
+  escala = 1,
+  voltear = false,
+): string {
+  const base =
+    esq === "inf-izq"
+      ? "matrix(1,0,0,1,0,0)"
+      : esq === "inf-der"
+        ? `matrix(-1,0,0,1,${W},0)`
+        : esq === "sup-izq"
+          ? `matrix(1,0,0,-1,0,${H})`
+          : `matrix(-1,0,0,-1,${W},${H})`;
+  const partes = [base];
   if (escala !== 1) partes.push(`matrix(${escala},0,0,${escala},0,0)`);
   if (voltear) partes.push(matVoltear(t));
   partes.push(matNativoACanonico(t));

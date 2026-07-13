@@ -11,10 +11,10 @@
 
 import { useRef, useState } from "react";
 import { cx, Logo, Btn } from "@/components/ui";
-import { DIAMETROS, BORDES } from "@/lib/planos/modelo";
-import type { Borde, Elemento, Perforacion, Pieza, Taca, TacaClave } from "@/lib/planos/modelo";
+import { DIAMETROS, BORDES, ESQUINAS } from "@/lib/planos/modelo";
+import type { Borde, Elemento, Esquina, Perforacion, Pieza, Taca, TacaClave } from "@/lib/planos/modelo";
 import { TACAS, TACAS_LISTA } from "@/lib/planos/tacas";
-import { transformTaca, cotaTaca } from "@/lib/planos/geometria";
+import { transformTaca, transformTacaEsquina, cotaTaca } from "@/lib/planos/geometria";
 
 // Estilos del plano embebidos en el propio SVG (para que el PNG serializado los conserve;
 // colores literales, sin var() porque el PNG se rinde aislado del documento).
@@ -48,8 +48,8 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 const EJEMPLO: Elemento[] = [
   { id: 1, tipo: "taca", clave: "bisagra", borde: "izq", dist: 18, voltear: false },
   { id: 2, tipo: "taca", clave: "bisagra", borde: "izq", dist: 180, voltear: false },
-  { id: 3, tipo: "taca", clave: "cerradura", borde: "der", dist: 100, voltear: false },
-  { id: 4, tipo: "taca", clave: "con_freno", borde: "inf", dist: 0, voltear: false },
+  { id: 3, tipo: "taca", clave: "cerradura", borde: "der", dist: 0, voltear: false, esquina: "inf-der" },
+  { id: 4, tipo: "taca", clave: "con_freno", borde: "inf", dist: 0, voltear: false, esquina: "inf-izq" },
   { id: 5, tipo: "perforacion", dia: 10, x: 25, y: 200 },
   { id: 6, tipo: "perforacion", dia: 8, x: 65, y: 200 },
 ];
@@ -67,6 +67,11 @@ function markerAnchor(e: Elemento, W: number, H: number, off: number, m: number)
     return [Math.min(W - off, e.x + off * 1.4), Math.min(H - off, e.y + off * 1.4)];
   }
   const anchoVis = TACAS[e.clave].ancho * boostTaca(TACAS[e.clave].ancho, m);
+  if (e.esquina) {
+    const cx = e.esquina.endsWith("izq") ? anchoVis / 2 : W - anchoVis / 2;
+    const cy = e.esquina.startsWith("inf") ? off : H - off;
+    return [cx, cy];
+  }
   const centro = e.dist + anchoVis / 2;
   switch (e.borde) {
     case "inf":
@@ -198,13 +203,12 @@ function PiezaSVG({
             );
           }
           const def = TACAS[e.clave];
+          const k = boostTaca(def.ancho, m);
+          const tr = e.esquina
+            ? transformTacaEsquina(def, e.esquina, W, H, k, e.voltear)
+            : transformTaca(def, e.borde, e.dist, e.voltear, W, H, k);
           return (
-            <g
-              key={e.id}
-              className={cx("pl-el", s && "sel")}
-              onClick={() => onSelect?.(e.id)}
-              transform={transformTaca(def, e.borde, e.dist, e.voltear, W, H, boostTaca(def.ancho, m))}
-            >
+            <g key={e.id} className={cx("pl-el", s && "sel")} onClick={() => onSelect?.(e.id)} transform={tr}>
               <TacaPrims clave={e.clave} />
             </g>
           );
@@ -290,7 +294,7 @@ function PiezaSVG({
 
       {/* distancias entre tacas del mismo borde (inicio a inicio) */}
       {(["inf", "sup", "izq", "der"] as Borde[]).map((bd) => {
-        const ts = (pieza.elementos.filter((e) => e.tipo === "taca" && e.borde === bd) as Taca[])
+        const ts = (pieza.elementos.filter((e) => e.tipo === "taca" && !e.esquina && e.borde === bd) as Taca[])
           .slice()
           .sort((a, b) => a.dist - b.dist);
         const ins = m * 0.05; // separación de la línea de cota respecto al borde
@@ -375,6 +379,7 @@ function Cotas({
       </>
     );
   }
+  if (el.esquina) return null; // las tacas de esquina van a distancia 0: sin cota
   const { a, b } = cotaTaca(el.borde, el.dist, W, H);
   const [ax, ay] = map(a[0], a[1]);
   const [bx, by] = map(b[0], b[1]);
@@ -416,6 +421,7 @@ export default function PlanosPage() {
   const [borde, setBorde] = useState<Borde>("izq");
   const [distTxt, setDistTxt] = useState("15");
   const [voltear, setVoltear] = useState(false);
+  const [esquinaSel, setEsquinaSel] = useState<Esquina>("inf-der");
 
   const idRef = useRef(100);
   const escenaRef = useRef<HTMLDivElement>(null);
@@ -424,6 +430,7 @@ export default function PlanosPage() {
   const H = Math.max(5, parseFloat(altoTxt) || 210);
   const pieza: Pieza = { ancho: W, alto: H, elementos };
   const esHueco = tipoSel.startsWith("hole:");
+  const esDeEsquina = !esHueco && TACAS[tipoSel.split(":")[1] as TacaClave].esquina;
   const bordeVertical = borde === "izq" || borde === "der";
 
   function agregar() {
@@ -433,6 +440,11 @@ export default function PlanosPage() {
       const x = clamp(parseFloat(hxTxt) || 0, 0, W);
       const y = clamp(parseFloat(hyTxt) || 0, 0, H);
       setElementos((p) => [...p, { id, tipo: "perforacion", dia: parseInt(v, 10), x, y }]);
+    } else if (TACAS[v as TacaClave].esquina) {
+      setElementos((p) => [
+        ...p,
+        { id, tipo: "taca", clave: v as TacaClave, borde: "inf", dist: 0, voltear, esquina: esquinaSel },
+      ]);
     } else {
       setElementos((p) => [
         ...p,
@@ -497,7 +509,9 @@ export default function PlanosPage() {
   const subTipo = (e: Elemento) =>
     e.tipo === "perforacion"
       ? `X ${fmt(e.x)} · Y ${fmt(e.y)} cm`
-      : `borde ${bordeNombre(e.borde)} · inicio a ${fmt(e.dist)} cm${e.voltear ? " · volteada" : ""}`;
+      : e.esquina
+        ? `esquina ${ESQUINAS.find((q) => q.valor === e.esquina)!.nombre.toLowerCase()}${e.voltear ? " · volteada" : ""}`
+        : `borde ${bordeNombre(e.borde)} · inicio a ${fmt(e.dist)} cm${e.voltear ? " · volteada" : ""}`;
 
   const fecha = new Date().toLocaleDateString("es-VE");
 
@@ -567,6 +581,22 @@ export default function PlanosPage() {
                     <NumInput value={hyTxt} onChange={setHyTxt} />
                   </Campo>
                 </div>
+              ) : esDeEsquina ? (
+                <>
+                  <Campo label="Esquina">
+                    <Select value={esquinaSel} onChange={(v) => setEsquinaSel(v as Esquina)}>
+                      {ESQUINAS.map((q) => (
+                        <option key={q.valor} value={q.valor}>
+                          {q.nombre}
+                        </option>
+                      ))}
+                    </Select>
+                  </Campo>
+                  <label className="mb-2 flex items-center gap-2 text-[13px]">
+                    <input type="checkbox" checked={voltear} onChange={(e) => setVoltear(e.target.checked)} />
+                    Voltear la taca
+                  </label>
+                </>
               ) : (
                 <>
                   <Campo label="Borde">
@@ -654,8 +684,8 @@ export default function PlanosPage() {
                 <BtnClaro onClick={exportarPNG}>Descargar PNG</BtnClaro>
               </div>
               <p className="mt-2 text-[11px] leading-snug text-[#8a8a80]">
-                Cerradura y todo visión c/ freno van en esquina: ponles distancia 0. Si una taca sale al revés, usa
-                “Voltear”.
+                Todo visión, c/ freno y cerradura van siempre en una esquina (solo eliges cuál). Si una taca sale al
+                revés, usa “Voltear”.
               </p>
             </Seccion>
           </aside>

@@ -15,6 +15,16 @@ export const BORDES: { valor: Borde; nombre: string }[] = [
   { valor: "der", nombre: "Derecha" },
 ];
 
+/** Esquina de la pieza (para tacas que van siempre en esquina). */
+export type Esquina = "inf-izq" | "inf-der" | "sup-izq" | "sup-der";
+
+export const ESQUINAS: { valor: Esquina; nombre: string }[] = [
+  { valor: "inf-izq", nombre: "Inferior izquierda" },
+  { valor: "inf-der", nombre: "Inferior derecha" },
+  { valor: "sup-izq", nombre: "Superior izquierda" },
+  { valor: "sup-der", nombre: "Superior derecha" },
+];
+
 /** Diámetros de broca disponibles (mm). Vocabulario cerrado: la vendedora elige de aquí. */
 export const DIAMETROS = [5, 6, 8, 10, 11, 12, 13, 15, 16, 19, 20, 22, 25, 28, 30, 40, 45, 55, 70];
 
@@ -27,14 +37,16 @@ export interface Perforacion {
   y: number;   // cm desde abajo
 }
 
-/** Taca (escotadura de canto) apoyada en un borde. */
+/** Taca (escotadura de canto) apoyada en un borde. Las tacas de esquina
+ *  (todo visión, con freno, cerradura) llevan `esquina` y anulan borde/dist. */
 export interface Taca {
   id: number;
   tipo: "taca";
   clave: TacaClave;
   borde: Borde;
-  dist: number;     // cm de la esquina del borde al INICIO de la taca
-  voltear: boolean; // espejo a lo largo del borde
+  dist: number;      // cm de la esquina del borde al INICIO de la taca
+  voltear: boolean;  // espejo a lo largo del borde
+  esquina?: Esquina; // si está presente, la taca va pegada a esa esquina
 }
 
 export type Elemento = Perforacion | Taca;
