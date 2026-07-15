@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# artefactos generados (PNG/PDF de planos) — no versionar
+/output
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
