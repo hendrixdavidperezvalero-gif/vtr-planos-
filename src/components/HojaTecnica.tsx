@@ -84,8 +84,7 @@ function TacaPrimsHT({ clave }: { clave: TacaClave }) {
 // Un elemento a la hoja: la pieza + su número grande + su título opcional.
 export interface PiezaHoja {
   pieza: Pieza;
-  numero: string; // "1", "2"… número grande al centro
-  titulo?: string; // "PUERTA", "PANEL FIJO"… bajo el número
+  titulo?: string; // "PUERTA", "PANEL FIJO"… al centro de la pieza
 }
 
 type MapFn = (x: number, y: number) => [number, number];
@@ -211,15 +210,15 @@ function dimHoriz(key: string, side: "sup" | "inf", xRef: number, valor: number,
 }
 
 // ---- Bloque de una pieza dentro de la hoja ----
-function PiezaBloque({ ph, originX, padSup, m, modaValor }: { ph: PiezaHoja; originX: number; padSup: number; m: number; modaValor: number | null }) {
-  const { pieza, numero, titulo } = ph;
+function PiezaBloque({ ph, originX, padSup, m }: { ph: PiezaHoja; originX: number; padSup: number; m: number }) {
+  const { pieza, titulo } = ph;
   const W = pieza.ancho,
     H = pieza.alto;
-  const fsDim = m * 0.024;
+  const fsDim = m * 0.02; // texto de cotas
+  const fsDia = m * 0.017; // etiqueta de diámetro (un punto menor que la cota)
   const fsTitulo = m * 0.024;
-  const fsNum = m * 0.15;
   const OFF0 = m * 0.045,
-    OFFSTEP = m * 0.038;
+    OFFSTEP = m * 0.036;
   const map: MapFn = (x, y) => [x, H - y];
 
   const perfs = pieza.elementos.filter((e): e is Perforacion => e.tipo === "perforacion");
@@ -300,12 +299,9 @@ function PiezaBloque({ ph, originX, padSup, m, modaValor }: { ph: PiezaHoja; ori
         })}
       </g>
 
-      {/* número grande + título (sin flip: fuera del grupo espejado) */}
-      <text className="ht-num" x={W / 2} y={H / 2} textAnchor="middle" dominantBaseline="central" fontSize={fsNum}>
-        {numero}
-      </text>
+      {/* título al centro (sin número: se confunde con la cantidad de piezas) */}
       {titulo && (
-        <text className="ht-titulo" x={W / 2} y={H / 2 + fsNum * 0.42 + fsTitulo * 1.2} textAnchor="middle" fontSize={fsTitulo}>
+        <text className="ht-titulo" x={W / 2} y={H / 2} textAnchor="middle" dominantBaseline="central" fontSize={fsTitulo}>
           {titulo.toUpperCase()}
         </text>
       )}
@@ -320,37 +316,31 @@ function PiezaBloque({ ph, originX, padSup, m, modaValor }: { ph: PiezaHoja; ori
       {dimHoriz("totW", "inf", 0, W, [0], OFF0 + infNiv.usados * OFFSTEP, W, H, m, fsDim, map)}
       {dimVert("totH", "der", 0, H, [W], OFF0 + derNiv.usados * OFFSTEP, W, H, m, fsDim, map)}
 
-      {/* etiquetas de diámetro para perforaciones que no calzan con la moda de la hoja */}
-      {modaValor != null &&
-        perfs
-          .filter((h) => h.dia !== modaValor)
-          .map((h) => {
-            const r = Math.max(h.dia / 20, m * 0.007);
-            let dx = W / 2 - h.x,
-              dy = H / 2 - h.y;
-            const len = Math.hypot(dx, dy) || 1;
-            dx /= len;
-            dy /= len;
-            const dist = r + fsDim * 1.1;
-            const [sx, sy] = map(h.x + dx * dist, h.y + dy * dist);
-            return (
-              <text
-                key={"dia" + h.id}
-                className="ht-dia"
-                x={sx}
-                y={sy}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fontSize={fsDim * 0.9}
-                stroke="#ffffff"
-                strokeWidth={fsDim * 0.2}
-                paintOrder="stroke"
-                strokeLinejoin="round"
-              >
-                Ø{h.dia}
-              </text>
-            );
-          })}
+      {/* etiqueta de diámetro en CADA perforación: siempre debe quedar claro su tamaño.
+          Se ancla a la ALTURA de su propio agujero y se desplaza sólo en horizontal
+          hacia el centro, para que agujeros vecinos (misma x) no encimen sus etiquetas. */}
+      {perfs.map((h) => {
+        const r = Math.max(h.dia / 20, m * 0.007);
+        const haciaCentro = h.x <= W / 2 ? 1 : -1; // +1 = etiqueta a la derecha del agujero
+        const [sx, sy] = map(h.x + haciaCentro * (r + fsDia * 0.7), h.y);
+        return (
+          <text
+            key={"dia" + h.id}
+            className="ht-dia"
+            x={sx}
+            y={sy}
+            textAnchor={haciaCentro > 0 ? "start" : "end"}
+            dominantBaseline="central"
+            fontSize={fsDia}
+            stroke="#ffffff"
+            strokeWidth={fsDia * 0.25}
+            paintOrder="stroke"
+            strokeLinejoin="round"
+          >
+            Ø{h.dia}
+          </text>
+        );
+      })}
     </g>
   );
 }
@@ -376,23 +366,9 @@ export function HojaTecnica({
     gap = m * 0.02;
   const fsNota = m * 0.026;
 
-  // moda de diámetros de TODAS las perforaciones de TODAS las piezas de la hoja
-  const todosDia = piezas.flatMap((ph) => ph.pieza.elementos.filter((e): e is Perforacion => e.tipo === "perforacion").map((e) => e.dia));
-  let modaValor: number | null = null;
-  let notaDiam: string | null = null;
-  if (todosDia.length) {
-    const freq = new Map<number, number>();
-    todosDia.forEach((d) => freq.set(d, (freq.get(d) || 0) + 1));
-    let max = -1;
-    freq.forEach((count, dia) => {
-      if (count > max) {
-        max = count;
-        modaValor = dia;
-      }
-    });
-    notaDiam = freq.size <= 1 ? `Todas las perforaciones Ø${modaValor} mm` : `Perforaciones Ø${modaValor} mm salvo indicadas`;
-  }
-  const notasFinal = notaDiam ? [notaDiam, ...notas] : notas;
+  // El tamaño de cada perforación se rotula directamente sobre su agujero, así que la
+  // hoja no lleva nota-resumen de diámetros: al pie solo van las notas que llegan.
+  const notasFinal = notas;
 
   // bloques uno al lado del otro, alineados por el borde superior
   const blockWidths = piezas.map((ph) => pad * 2 + ph.pieza.ancho);
@@ -423,7 +399,7 @@ export function HojaTecnica({
       <style>{HT_CSS}</style>
 
       {piezas.map((ph, i) => (
-        <PiezaBloque key={i} ph={ph} originX={xOffsets[i] + pad} padSup={padSup} m={m} modaValor={modaValor} />
+        <PiezaBloque key={i} ph={ph} originX={xOffsets[i] + pad} padSup={padSup} m={m} />
       ))}
 
       {notasFinal.map((linea, i) => (

@@ -432,9 +432,11 @@ export default function PlanosPage() {
   const [voltear, setVoltear] = useState(false);
   const [esquinaSel, setEsquinaSel] = useState<Esquina>("inf-der");
 
-  // sistema MILANO (solo modo milano)
+  // sistema MILANO (solo modo milano) — cada pieza con su propio ancho y alto.
   const [anchoFijoTxt, setAnchoFijoTxt] = useState("80");
-  const [anchoPuertaTxt, setAnchoPuertaTxt] = useState("79");
+  const [altoFijoTxt, setAltoFijoTxt] = useState("210");
+  const [anchoPuertaTxt, setAnchoPuertaTxt] = useState("80");
+  const [altoPuertaTxt, setAltoPuertaTxt] = useState("209");
   const [manillon, setManillon] = useState<"der" | "izq">("der");
 
   const idRef = useRef(100);
@@ -448,32 +450,31 @@ export default function PlanosPage() {
   const esDeEsquina = !esHueco && TACAS[tipoSel.split(":")[1] as TacaClave].esquina;
   const bordeVertical = borde === "izq" || borde === "der";
 
-  // cambiar el ancho del fijo autocompleta el de la puerta (fijo − 1), sin bloquear
-  // que la vendedora lo edite después.
-  function onAnchoFijoChange(v: string) {
-    setAnchoFijoTxt(v);
+  // La regla "1 cm menos" es sobre el ALTO: cambiar el alto del fijo autocompleta el
+  // de la puerta (fijo − 1), sin bloquear que la vendedora lo edite después.
+  function onAltoFijoChange(v: string) {
+    setAltoFijoTxt(v);
     const n = parseFloat(v);
-    if (!Number.isNaN(n)) setAnchoPuertaTxt(String(n - 1));
+    if (!Number.isNaN(n)) setAltoPuertaTxt(String(n - 1));
   }
 
   const anchoFijo = Math.max(5, parseFloat(anchoFijoTxt) || 80);
-  const anchoPuerta = Math.max(5, parseFloat(anchoPuertaTxt) || 79);
-  const altoMilano = H;
+  const altoFijo = Math.max(5, parseFloat(altoFijoTxt) || 210);
+  const anchoPuerta = Math.max(5, parseFloat(anchoPuertaTxt) || 80);
+  const altoPuerta = Math.max(5, parseFloat(altoPuertaTxt) || 209);
   const milano = useMemo(
-    () => generarMilano({ anchoPuerta, altoPuerta: altoMilano, anchoFijo, altoFijo: altoMilano, manillon }),
-    [anchoPuerta, altoMilano, anchoFijo, manillon],
+    () => generarMilano({ anchoPuerta, altoPuerta, anchoFijo, altoFijo, manillon }),
+    [anchoPuerta, altoPuerta, anchoFijo, altoFijo, manillon],
   );
   const piezasHoja: PiezaHoja[] = [
-    { pieza: milano.puerta, numero: "1", titulo: "PUERTA" },
-    { pieza: milano.fijo, numero: "2", titulo: "PANEL FIJO" },
+    { pieza: milano.puerta, titulo: "PUERTA" },
+    { pieza: milano.fijo, titulo: "PANEL FIJO" },
   ];
+  // MILANO: la hoja no lleva pie de notas (los datos del sistema y del cliente van en
+  // el encabezado de impresión; el tamaño de cada perforación se rotula en su agujero).
   const notasHoja: string[] =
     modo === "milano"
-      ? [
-          `Sistema MILANO · manillón a la ${manillon === "der" ? "derecha" : "izquierda"}`,
-          `Puerta ${fmt(milano.puerta.ancho)}×${fmt(milano.puerta.alto)} cm · Panel fijo ${fmt(milano.fijo.ancho)}×${fmt(milano.fijo.alto)} cm`,
-          ...(cliente ? [`Cliente: ${cliente}`] : []),
-        ]
+      ? []
       : [...(descripcion ? [descripcion] : []), ...(cliente ? [`Cliente: ${cliente}`] : [])];
 
   function agregar() {
@@ -541,7 +542,7 @@ export default function PlanosPage() {
       canvas.toBlob((b) => {
         if (!b) return;
         const u = URL.createObjectURL(b);
-        const nombre = modo === "milano" ? `plano-milano-${fmt(anchoFijo)}x${fmt(altoMilano)}.png` : `plano-${fmt(W)}x${fmt(H)}.png`;
+        const nombre = modo === "milano" ? `plano-milano-${fmt(anchoFijo)}x${fmt(altoFijo)}.png` : `plano-${fmt(W)}x${fmt(H)}.png`;
         descargar(u, nombre);
         URL.revokeObjectURL(u);
       }, "image/png");
@@ -597,17 +598,24 @@ export default function PlanosPage() {
 
             {modo === "milano" && (
               <Seccion titulo="Sistema MILANO">
+                <b className="block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6a6a60]">Panel fijo</b>
                 <div className="flex gap-2">
                   <Campo label="Ancho fijo (cm)">
-                    <NumInput value={anchoFijoTxt} onChange={onAnchoFijoChange} />
+                    <NumInput value={anchoFijoTxt} onChange={setAnchoFijoTxt} />
                   </Campo>
+                  <Campo label="Alto fijo (cm)">
+                    <NumInput value={altoFijoTxt} onChange={onAltoFijoChange} />
+                  </Campo>
+                </div>
+                <b className="mt-1 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6a6a60]">Puerta</b>
+                <div className="flex gap-2">
                   <Campo label="Ancho puerta (cm)">
                     <NumInput value={anchoPuertaTxt} onChange={setAnchoPuertaTxt} />
                   </Campo>
+                  <Campo label="Alto puerta (cm)">
+                    <NumInput value={altoPuertaTxt} onChange={setAltoPuertaTxt} />
+                  </Campo>
                 </div>
-                <Campo label="Alto (cm)">
-                  <NumInput value={altoTxt} onChange={setAltoTxt} />
-                </Campo>
                 <Campo label="Manillón">
                   <Select value={manillon} onChange={(v) => setManillon(v as "der" | "izq")}>
                     <option value="der">Derecha</option>
@@ -874,7 +882,7 @@ export default function PlanosPage() {
           /* plano a la izquierda, medidas a la derecha — todo en la primera hoja */
           <div className="flex break-inside-avoid gap-5">
             <div className="w-[57%] flex-none">
-              <HojaTecnica piezas={[{ pieza, numero: "1" }]} notas={notasHoja} forPrint />
+              <HojaTecnica piezas={[{ pieza }]} notas={notasHoja} forPrint />
             </div>
             <div className="flex-1">
               <h2 className="mb-4 font-display text-[18px] font-bold uppercase tracking-[0.08em] text-[#4a463f]">Medidas</h2>

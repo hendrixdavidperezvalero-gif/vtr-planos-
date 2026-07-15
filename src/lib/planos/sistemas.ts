@@ -45,9 +45,10 @@ export function generarMilano(a: AjustesMilano): { puerta: Pieza; fijo: Pieza; a
   ];
 
   // Panel fijo: 2 perforaciones superiores, una por lado.
+  // 7 cm desde el tope hasta la perforación · 10 cm desde el borde vertical (altura).
   const fijoEls: Perforacion[] = [
-    { id: 1, tipo: "perforacion", dia: 16, x: 7, y: Hf - 10 },
-    { id: 2, tipo: "perforacion", dia: 16, x: Wf - 7, y: Hf - 10 },
+    { id: 1, tipo: "perforacion", dia: 16, x: 10, y: Hf - 7 },
+    { id: 2, tipo: "perforacion", dia: 16, x: Wf - 10, y: Hf - 7 },
   ];
 
   const puerta: Pieza = { ancho: W, alto: H, elementos: puertaEls };
@@ -56,10 +57,11 @@ export function generarMilano(a: AjustesMilano): { puerta: Pieza; fijo: Pieza; a
   const avisos: string[] = [];
   avisoAncho("puerta", W, avisos);
   avisoAncho("panel fijo", Wf, avisos);
-  avisoAlto("puerta", H, avisos);
+  // El fijo es la pieza de referencia (nominal 210); la puerta va derivada del fijo.
   avisoAlto("panel fijo", Hf, avisos);
-  if (W !== Wf - MILANO_LIMITES.deltaPuerta) {
-    avisos.push("La puerta suele medir 1 cm menos que el fijo");
+  // La regla "1 cm menos" es sobre el ALTO: la puerta suele medir 1 cm menos que el fijo.
+  if (H !== Hf - MILANO_LIMITES.deltaPuerta) {
+    avisos.push("La puerta suele medir 1 cm menos de alto que el fijo");
   }
 
   return { puerta, fijo, avisos };
