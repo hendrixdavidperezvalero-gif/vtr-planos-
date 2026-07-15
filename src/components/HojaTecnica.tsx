@@ -160,7 +160,6 @@ function dimVert(key: string, side: "izq" | "der", yRef: number, valor: number, 
   const [cax, cay] = map(xEdge, yRef);
   const [cbx, cby] = map(xLine + over, yRef);
   const midY = (lay + lby) / 2;
-  const dir = side === "izq" ? -1 : 1;
   return (
     <g key={key}>
       <line className="ht-ext" x1={cax} y1={cay} x2={cbx} y2={cby} strokeWidth={1} vectorEffect="non-scaling-stroke" />
@@ -172,7 +171,19 @@ function dimVert(key: string, side: "izq" | "der", yRef: number, valor: number, 
       <line className="ht-dim" x1={lax} y1={lay} x2={lbx} y2={lby} strokeWidth={1.6} vectorEffect="non-scaling-stroke" />
       {tick(lax, lay, m, "t1")}
       {tick(lbx, lby, m, "t2")}
-      <text className="ht-dimtxt" transform={`translate(${xLine + dir * fsDim * 0.45}, ${midY}) rotate(-90)`} textAnchor="middle" fontSize={fsDim}>
+      {/* número horizontal (no rotado) centrado sobre la línea; el halo blanco la tapa detrás */}
+      <text
+        className="ht-dimtxt"
+        x={lax}
+        y={midY}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={fsDim}
+        stroke="#ffffff"
+        strokeWidth={fsDim * 0.3}
+        paintOrder="stroke"
+        strokeLinejoin="round"
+      >
         {fmt(valor)}
       </text>
     </g>
@@ -202,7 +213,17 @@ function dimHoriz(key: string, side: "sup" | "inf", xRef: number, valor: number,
       <line className="ht-dim" x1={lax} y1={lay} x2={lbx} y2={lby} strokeWidth={1.6} vectorEffect="non-scaling-stroke" />
       {tick(lax, lay, m, "t1")}
       {tick(lbx, lby, m, "t2")}
-      <text className="ht-dimtxt" x={midX} y={textY} textAnchor="middle" fontSize={fsDim}>
+      <text
+        className="ht-dimtxt"
+        x={midX}
+        y={textY}
+        textAnchor="middle"
+        fontSize={fsDim}
+        stroke="#ffffff"
+        strokeWidth={fsDim * 0.3}
+        paintOrder="stroke"
+        strokeLinejoin="round"
+      >
         {fmt(valor)}
       </text>
     </g>
