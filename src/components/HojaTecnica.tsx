@@ -1,7 +1,7 @@
 // vtr-planos — HojaTecnica: render de "plano de taller clásico" (hoja blanca, cotas
-// con líneas de extensión y ticks a 45°, número grande de pieza al centro, notas al
-// pie) con toques VTR (número/oro). Reemplaza al render de PiezaSVG en el bloque de
-// impresión, en el export PNG y es el render principal del modo MILANO.
+// con líneas de extensión y ticks a 45°, título de la pieza al centro) con toques VTR
+// (negro/oro). Es el ÚNICO render del plano: pantalla, impresión y export PNG, tanto
+// en pieza libre como en el sistema MILANO.
 //
 // Mismas convenciones que el resto de /lib/planos: unidades de usuario SVG = cm
 // reales (mm solo para diámetro), origen (0,0) esquina inferior izquierda, y hacia
@@ -23,21 +23,99 @@ text{font-family:Inter,system-ui,sans-serif}
 .ht-ext{stroke:#1a1a1a;stroke-opacity:.45;fill:none}
 .ht-dim{stroke:#1a1a1a;fill:none}
 .ht-dimtxt{fill:#1a1a1a;font-weight:600}
-.ht-num{fill:#1a1a1a;fill-opacity:.85;font-weight:800}
 .ht-titulo{fill:#9d7a1f;font-weight:800;letter-spacing:.14em}
 .ht-dia{fill:#9d7a1f;font-weight:700}
-.ht-nota{fill:#1a1a1a}
 .ht-taca{fill:#ffffff;stroke:#1a1a1a}
 .ht-taca-linea{fill:none;stroke:#1a1a1a}
 `;
 
-const S0 = 3.2; // px por cm base (se multiplica por el zoom), igual que PiezaSVG
+const S0 = 3.2; // px por cm base (se multiplica por el zoom)
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
-// Factor de agrandado visual de una taca (igual criterio que en page.tsx: garantiza
-// un ancho dibujado mínimo relativo a la pieza, sin tocar la cota real).
+// Alto máximo de la hoja impresa: el plano DEBE salir en una sola página. Es el alto
+// de una Letter (11in, la más corta frente a A4) menos los márgenes de impresión y el
+// encabezado. Verificado contando páginas del PDF con puerta 90×210 y con MILANO.
+const MAX_ALTO_HOJA = "8.9in";
+
+// Factor de agrandado visual de una taca: garantiza un ancho dibujado mínimo relativo
+// a la pieza, sin tocar la cota real.
 function boostTaca(anchoReal: number, m: number): number {
   return Math.max(1, (m * 0.09) / anchoReal);
+}
+
+// Huella dibujada de una taca sobre su borde. `voltear` no entra: espeja la forma
+// dentro de su propio tramo, no lo mueve. Las tacas de esquina se apoyan siempre en un
+// borde horizontal (ver transformTacaEsquina), de ahí que `horizontal` las incluya.
+function huellaTaca(t: Taca, W: number, m: number) {
+  const def = TACAS[t.clave];
+  const k = boostTaca(def.ancho, m);
+  const largo = def.ancho * k; // tramo dibujado a lo largo del borde
+  const fondo = ((def.nvb[1] * def.ancho) / def.nvb[0]) * k; // lo que entra al vidrio
+  const horizontal = !!t.esquina || t.borde === "inf" || t.borde === "sup";
+  const arriba = t.esquina ? t.esquina.startsWith("sup") : t.borde === "sup";
+  // centro del tramo a lo largo del borde (X si el borde es horizontal, Y si vertical)
+  const centro = t.esquina ? (t.esquina.endsWith("izq") ? largo / 2 : W - largo / 2) : t.dist + largo / 2;
+  return { largo, fondo, horizontal, arriba, centro };
+}
+
+// Ancho aproximado de un texto: SVG no mide sin rasterizar y el rótulo hay que
+// encajarlo DENTRO de la pieza, así que se estima por el avance medio de Inter bold.
+const ANCHO_CARACTER = 0.56;
+const anchoTexto = (s: string, fs: number) => s.length * ANCHO_CARACTER * fs;
+
+/** Rótulo (herraje + posición) de cada taca de la pieza. La hoja no lleva leyenda
+ *  aparte, así que el plano tiene que decir por sí solo qué va en cada escotadura.
+ *  - Borde vertical (izq/der): el texto entra al vidrio a la altura de su taca.
+ *  - Borde horizontal (inf/sup, incl. esquinas): el texto va por encima/debajo de la
+ *    taca, centrado en ella pero METIDO a la fuerza dentro de la pieza — una taca de
+ *    esquina está pegada al canto y su rótulo, centrado, se saldría y pisaría las
+ *    cotas del margen. Si dos rótulos del mismo borde se pisarían, se apilan. */
+function rotulosTacas(lista: Taca[], W: number, H: number, m: number, fs: number) {
+  const gap = fs * 0.9;
+  const paso = fs * 1.35; // separación entre rótulos apilados
+
+  const verticales = lista.filter((t) => !huellaTaca(t, W, m).horizontal);
+  const horizontales = lista.filter((t) => huellaTaca(t, W, m).horizontal);
+
+  const rotVert = verticales.map((t) => {
+    const { fondo, centro } = huellaTaca(t, W, m);
+    const izq = t.borde === "izq";
+    return {
+      id: t.id,
+      texto: TACAS[t.clave].nombre,
+      x: izq ? fondo + gap : W - fondo - gap,
+      y: centro,
+      anchor: (izq ? "start" : "end") as "start" | "end",
+    };
+  });
+
+  // los horizontales se resuelven por borde: primero se centran y se encajan dentro
+  // de la pieza, después se reparten niveles para que no se pisen entre sí
+  const rotHoriz = (["inf", "sup"] as const).flatMap((lado) => {
+    const grupo = horizontales.filter((t) => huellaTaca(t, W, m).arriba === (lado === "sup"));
+    const cajas = grupo.map((t) => {
+      const { centro } = huellaTaca(t, W, m);
+      const texto = TACAS[t.clave].nombre;
+      const medio = anchoTexto(texto, fs) / 2;
+      // si el rótulo es más ancho que la pieza no hay dónde encajarlo: se centra y ya
+      const x = medio * 2 >= W ? W / 2 : Math.max(medio, Math.min(W - medio, centro));
+      return { t, texto, span: [x - medio, x + medio] as [number, number], x };
+    });
+    const { nivel } = nivelesSinSolape(cajas.map((c) => c.span));
+    return cajas.map((c, i) => {
+      const { fondo } = huellaTaca(c.t, W, m);
+      const sep = fondo + gap + nivel[i] * paso;
+      return {
+        id: c.t.id,
+        texto: c.texto,
+        x: c.x,
+        y: lado === "sup" ? H - sep : sep,
+        anchor: "middle" as const,
+      };
+    });
+  });
+
+  return [...rotVert, ...rotHoriz];
 }
 
 /** Trazos de una taca (coords nativas), variante de estilo "hoja técnica". */
@@ -362,19 +440,42 @@ function PiezaBloque({ ph, originX, padSup, m }: { ph: PiezaHoja; originX: numbe
           </text>
         );
       })}
+
+      {/* rótulo en CADA taca, en el mismo oro que el Ø de las perforaciones */}
+      {rotulosTacas([...tacasEsquina, ...tacas], W, H, m, fsDia).map((r) => {
+        const [sx, sy] = map(r.x, r.y);
+        return (
+          <text
+            key={"rot" + r.id}
+            className="ht-dia"
+            x={sx}
+            y={sy}
+            textAnchor={r.anchor}
+            dominantBaseline="central"
+            fontSize={fsDia}
+            stroke="#ffffff"
+            strokeWidth={fsDia * 0.25}
+            paintOrder="stroke"
+            strokeLinejoin="round"
+          >
+            {r.texto}
+          </text>
+        );
+      })}
     </g>
   );
 }
 
-// ---- Hoja técnica: 1..N piezas lado a lado, notas al pie ----
+// ---- Hoja técnica: 1..N piezas lado a lado ----
+// La hoja es autosuficiente y no lleva pie de notas: cada elemento se rotula sobre el
+// plano (Ø en su agujero, herraje en su taca) y los datos de cliente/pieza van en el
+// encabezado de impresión.
 export function HojaTecnica({
   piezas,
-  notas = [],
   zoom = 1,
   forPrint = false,
 }: {
   piezas: PiezaHoja[];
-  notas?: string[];
   zoom?: number;
   forPrint?: boolean;
 }) {
@@ -385,11 +486,6 @@ export function HojaTecnica({
     padSup = m * 0.13,
     padInf = m * 0.13,
     gap = m * 0.02;
-  const fsNota = m * 0.026;
-
-  // El tamaño de cada perforación se rotula directamente sobre su agujero, así que la
-  // hoja no lleva nota-resumen de diámetros: al pie solo van las notas que llegan.
-  const notasFinal = notas;
 
   // bloques uno al lado del otro, alineados por el borde superior
   const blockWidths = piezas.map((ph) => pad * 2 + ph.pieza.ancho);
@@ -402,9 +498,7 @@ export function HojaTecnica({
   });
   const vbW = acc;
   const maxH = piezas.length ? Math.max(...piezas.map((ph) => ph.pieza.alto)) : 0;
-  const vbHTop = padSup + maxH + padInf;
-  const notaAlto = notasFinal.length * fsNota * 1.9 + m * 0.03;
-  const vbH = vbHTop + notaAlto;
+  const vbH = padSup + maxH + padInf;
 
   const S = S0 * zoom;
 
@@ -415,18 +509,15 @@ export function HojaTecnica({
       viewBox={`0 0 ${vbW} ${vbH}`}
       width={forPrint ? undefined : vbW * S}
       height={forPrint ? undefined : vbH * S}
-      style={forPrint ? { width: "100%", height: "auto" } : undefined}
+      // Al imprimir la hoja ocupa el ancho, pero el tope de alto manda: una hoja de una
+      // sola pieza vertical (p. ej. 90×210) escalada solo por el ancho se desborda y el
+      // PDF sale en varias páginas. Con el tope, preserveAspectRatio la encoge y centra.
+      style={forPrint ? { width: "100%", height: "auto", maxHeight: MAX_ALTO_HOJA } : undefined}
     >
       <style>{HT_CSS}</style>
 
       {piezas.map((ph, i) => (
         <PiezaBloque key={i} ph={ph} originX={xOffsets[i] + pad} padSup={padSup} m={m} />
-      ))}
-
-      {notasFinal.map((linea, i) => (
-        <text key={i} className="ht-nota" x={vbW / 2} y={vbHTop + m * 0.03 + fsNota + i * fsNota * 1.9} textAnchor="middle" fontSize={fsNota}>
-          {linea}
-        </text>
       ))}
     </svg>
   );
