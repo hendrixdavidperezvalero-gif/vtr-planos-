@@ -47,6 +47,9 @@ export interface Taca {
   dist: number;      // cm de la esquina del borde al INICIO de la taca
   voltear: boolean;  // espejo a lo largo del borde
   esquina?: Esquina; // si está presente, la taca va pegada a esa esquina
+  desdeFin?: boolean; // dist medida desde el OTRO extremo del borde (arriba en bordes
+  // verticales, derecha en horizontales): la cota sale de esa esquina — así una
+  // bisagra "a 20 del tope" cota 20 y no (alto − 20 − taca).
 }
 
 export type Elemento = Perforacion | Taca;

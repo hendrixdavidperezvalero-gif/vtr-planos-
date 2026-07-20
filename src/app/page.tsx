@@ -6,20 +6,20 @@
 // (Ø mm por coordenada) y TACAS (escotaduras reales sobre un borde, medidas de la
 // esquina al INICIO de la taca).
 //
-// Los dos modos (pieza libre y sistema MILANO) entregan la MISMA hoja de taller
-// (HojaTecnica): lo único que cambia es de dónde salen las piezas — a mano en libre,
-// de las reglas del sistema en MILANO.
+// Todos los modos (pieza libre y los sistemas MILANO / Todo Visión / Batiente)
+// entregan la MISMA hoja de taller (HojaTecnica): lo único que cambia es de dónde
+// salen las piezas — a mano en libre, de las reglas del sistema en los demás.
 
 "use client";
 
 import { useMemo, useRef, useState } from "react";
 import { cx, Logo, Btn } from "@/components/ui";
 import { DIAMETROS, BORDES, ESQUINAS } from "@/lib/planos/modelo";
-import type { Borde, Elemento, Esquina, Perforacion, Pieza, TacaClave } from "@/lib/planos/modelo";
+import type { Borde, Elemento, Esquina, Pieza, TacaClave } from "@/lib/planos/modelo";
 import { TACAS, TACAS_LISTA } from "@/lib/planos/tacas";
 import { HojaTecnica } from "@/components/HojaTecnica";
 import type { PiezaHoja } from "@/components/HojaTecnica";
-import { generarMilano } from "@/lib/planos/sistemas";
+import { generarBatiente, generarMilano, generarTodoVision } from "@/lib/planos/sistemas";
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
@@ -34,9 +34,18 @@ const EJEMPLO: Elemento[] = [
   { id: 6, tipo: "perforacion", dia: 8, x: 65, y: 200 },
 ];
 
+type Modo = "libre" | "milano" | "todovision" | "batiente";
+
+// Nombre del sistema en el encabezado de impresión.
+const NOMBRE_SISTEMA: Record<Exclude<Modo, "libre">, string> = {
+  milano: "Sistema MILANO",
+  todovision: "Todo Visión con cerradura",
+  batiente: "Puerta batiente",
+};
+
 // ---- Página ----
 export default function PlanosPage() {
-  const [modo, setModo] = useState<"libre" | "milano">("libre");
+  const [modo, setModo] = useState<Modo>("libre");
 
   const [anchoTxt, setAnchoTxt] = useState("90");
   const [altoTxt, setAltoTxt] = useState("210"); // compartido: alto de la pieza libre Y de ambas piezas MILANO
@@ -61,6 +70,11 @@ export default function PlanosPage() {
   const [anchoPuertaTxt, setAnchoPuertaTxt] = useState("80");
   const [altoPuertaTxt, setAltoPuertaTxt] = useState("209");
   const [manillon, setManillon] = useState<"der" | "izq">("der");
+
+  // puertas de una sola hoja (Todo Visión / Batiente) — comparten medidas y manillón.
+  const [anchoSolaTxt, setAnchoSolaTxt] = useState("90");
+  const [altoSolaTxt, setAltoSolaTxt] = useState("210");
+  const [largoManillonTxt, setLargoManillonTxt] = useState("30");
 
   const idRef = useRef(100);
   const escenaRef = useRef<HTMLDivElement>(null);
@@ -89,7 +103,22 @@ export default function PlanosPage() {
     () => generarMilano({ anchoPuerta, altoPuerta, anchoFijo, altoFijo, manillon }),
     [anchoPuerta, altoPuerta, anchoFijo, altoFijo, manillon],
   );
-  // Ambos modos entregan la MISMA hoja de taller: piezas lado a lado, cada elemento
+
+  const anchoSola = Math.max(5, parseFloat(anchoSolaTxt) || 90);
+  const altoSola = Math.max(5, parseFloat(altoSolaTxt) || 210);
+  const largoManillon = Math.max(1, parseFloat(largoManillonTxt) || 30);
+  const sola = useMemo(
+    () =>
+      (modo === "batiente" ? generarBatiente : generarTodoVision)({
+        ancho: anchoSola,
+        alto: altoSola,
+        manillon,
+        largoManillon,
+      }),
+    [modo, anchoSola, altoSola, manillon, largoManillon],
+  );
+
+  // Todos los modos entregan la MISMA hoja de taller: piezas lado a lado, cada elemento
   // rotulado sobre el plano (Ø en su agujero, nombre en su taca) y sin pie de notas —
   // los datos del cliente y de la pieza van en el encabezado de impresión.
   const piezasHoja: PiezaHoja[] =
@@ -98,7 +127,9 @@ export default function PlanosPage() {
           { pieza: milano.puerta, titulo: "PUERTA" },
           { pieza: milano.fijo, titulo: "PANEL FIJO" },
         ]
-      : [{ pieza, titulo: descripcion || undefined }];
+      : modo === "libre"
+        ? [{ pieza, titulo: descripcion || undefined }]
+        : [{ pieza: sola.puerta, titulo: "PUERTA" }];
 
   function agregar() {
     const [k, v] = tipoSel.split(":");
@@ -165,7 +196,12 @@ export default function PlanosPage() {
       canvas.toBlob((b) => {
         if (!b) return;
         const u = URL.createObjectURL(b);
-        const nombre = modo === "milano" ? `plano-milano-${fmt(anchoFijo)}x${fmt(altoFijo)}.png` : `plano-${fmt(W)}x${fmt(H)}.png`;
+        const nombre =
+          modo === "milano"
+            ? `plano-milano-${fmt(anchoFijo)}x${fmt(altoFijo)}.png`
+            : modo === "libre"
+              ? `plano-${fmt(W)}x${fmt(H)}.png`
+              : `plano-${modo}-${fmt(anchoSola)}x${fmt(altoSola)}.png`;
         descargar(u, nombre);
         URL.revokeObjectURL(u);
       }, "image/png");
@@ -181,7 +217,9 @@ export default function PlanosPage() {
       ? `X ${fmt(e.x)} · Y ${fmt(e.y)} cm`
       : e.esquina
         ? `esquina ${ESQUINAS.find((q) => q.valor === e.esquina)!.nombre.toLowerCase()}${e.voltear ? " · volteada" : ""}`
-        : `borde ${bordeNombre(e.borde)} · inicio a ${fmt(e.dist)} cm${e.voltear ? " · volteada" : ""}`;
+        : `borde ${bordeNombre(e.borde)} · inicio a ${fmt(e.dist)} cm${
+            e.desdeFin ? (e.borde === "izq" || e.borde === "der" ? " desde arriba" : " desde la derecha") : ""
+          }${e.voltear ? " · volteada" : ""}`;
 
   const fecha = new Date().toLocaleDateString("es-VE");
 
@@ -201,12 +239,18 @@ export default function PlanosPage() {
         <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-[300px_minmax(0,1fr)_300px]">
           {/* ---- sidebar izquierda: modo + pieza/sistema + agregar ---- */}
           <aside className="flex flex-col gap-4">
-            <div className="flex gap-1.5 rounded-[4px] border border-[#d8d8cf] bg-white p-1">
+            <div className="grid grid-cols-2 gap-1.5 rounded-[4px] border border-[#d8d8cf] bg-white p-1">
               <ModoTab active={modo === "libre"} onClick={() => setModo("libre")}>
                 Pieza libre
               </ModoTab>
               <ModoTab active={modo === "milano"} onClick={() => setModo("milano")}>
-                Sistema MILANO
+                MILANO
+              </ModoTab>
+              <ModoTab active={modo === "todovision"} onClick={() => setModo("todovision")}>
+                Todo Visión
+              </ModoTab>
+              <ModoTab active={modo === "batiente"} onClick={() => setModo("batiente")}>
+                Batiente
               </ModoTab>
             </div>
 
@@ -245,15 +289,39 @@ export default function PlanosPage() {
                     <option value="izq">Izquierda</option>
                   </Select>
                 </Campo>
-                {milano.avisos.length > 0 && (
-                  <div className="mt-1 flex flex-col gap-1 rounded-[4px] border border-oro-dark/30 bg-oro-dark/10 p-2">
-                    {milano.avisos.map((a, i) => (
-                      <p key={i} className="text-[11px] leading-snug text-oro-dark">
-                        ⚠ {a}
-                      </p>
-                    ))}
-                  </div>
-                )}
+                <Avisos lista={milano.avisos} />
+              </Seccion>
+            )}
+
+            {(modo === "todovision" || modo === "batiente") && (
+              <Seccion titulo={NOMBRE_SISTEMA[modo]}>
+                <div className="flex gap-2">
+                  <Campo label="Ancho (cm)">
+                    <NumInput value={anchoSolaTxt} onChange={setAnchoSolaTxt} />
+                  </Campo>
+                  <Campo label="Alto (cm)">
+                    <NumInput value={altoSolaTxt} onChange={setAltoSolaTxt} />
+                  </Campo>
+                </div>
+                <div className="flex gap-2">
+                  <Campo label="Manillón">
+                    <Select value={manillon} onChange={(v) => setManillon(v as "der" | "izq")}>
+                      <option value="der">Derecha</option>
+                      <option value="izq">Izquierda</option>
+                    </Select>
+                  </Campo>
+                  <Campo label="Largo manillón (cm)">
+                    <NumInput value={largoManillonTxt} onChange={setLargoManillonTxt} />
+                  </Campo>
+                </div>
+                <p className="text-[11px] leading-snug text-[#8a8a80]">
+                  Manillón: 2 perforaciones Ø15 en los extremos, a 10 cm del borde. Centro a mitad del alto; si la
+                  puerta pasa de 220 cm, fijo a 110 cm.
+                  {modo === "batiente"
+                    ? " Bisagras a 20 cm del borde de arriba y de abajo."
+                    : " 3 tacas todo visión en esquina; la del lado del manillón hace de cerradura."}
+                </p>
+                <Avisos lista={sola.avisos} />
               </Seccion>
             )}
 
@@ -356,9 +424,13 @@ export default function PlanosPage() {
               <span className="tabular w-12 text-center text-[13px]">{Math.round(zoom * 100)}%</span>
               <BtnClaro onClick={() => setZoom((z) => clamp(+(z + 0.25).toFixed(2), 0.5, 2.5))}>+</BtnClaro>
               <span className="ml-auto text-[12px] text-[#8a8a80]">
-                {modo === "libre"
-                  ? `${elementos.length} elemento${elementos.length === 1 ? "" : "s"}`
-                  : `${milano.puerta.elementos.length + milano.fijo.elementos.length} perforaciones`}
+                {(() => {
+                  const n =
+                    modo === "libre"
+                      ? elementos.length
+                      : piezasHoja.reduce((acc, ph) => acc + ph.pieza.elementos.length, 0);
+                  return `${n} elemento${n === 1 ? "" : "s"}`;
+                })()}
               </span>
             </div>
             <div ref={escenaRef} className="flex justify-center overflow-auto rounded-[4px] border border-[#d8d8cf] bg-white p-4">
@@ -403,18 +475,23 @@ export default function PlanosPage() {
                 </div>
               </Seccion>
             ) : (
-              <Seccion titulo="Perforaciones">
+              <Seccion titulo="Elementos">
                 <div className="flex flex-col gap-3">
-                  {[
-                    { nombre: "Puerta", pz: milano.puerta },
-                    { nombre: "Panel fijo", pz: milano.fijo },
-                  ].map(({ nombre, pz }) => (
-                    <div key={nombre}>
-                      <b className="mb-1 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6a6a60]">{nombre}</b>
+                  {piezasHoja.map(({ pieza: pz, titulo }) => (
+                    <div key={titulo}>
+                      <b className="mb-1 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6a6a60]">{titulo}</b>
                       <div className="flex flex-col gap-1">
-                        {(pz.elementos as Perforacion[]).map((h) => (
-                          <p key={h.id} className="tabular text-[12px] text-negro">
-                            Ø{h.dia} · X {fmt(h.x)} · Y {fmt(h.y)} cm
+                        {pz.elementos.map((e) => (
+                          <p key={e.id} className="tabular text-[12px] leading-snug text-negro">
+                            {e.tipo === "perforacion" ? (
+                              <>
+                                Ø{e.dia} · X {fmt(e.x)} · Y {fmt(e.y)} cm
+                              </>
+                            ) : (
+                              <>
+                                {TACAS[e.clave].nombre} · {subTipo(e)}
+                              </>
+                            )}
                           </p>
                         ))}
                       </div>
@@ -447,7 +524,7 @@ export default function PlanosPage() {
             <Logo size={46} />
             <div>
               <h1 className="font-display text-xl font-bold">
-                Plano de perforación{modo === "milano" ? " · Sistema MILANO" : ""}
+                Plano de perforación{modo !== "libre" ? ` · ${NOMBRE_SISTEMA[modo]}` : ""}
               </h1>
               <p className="text-[11px] uppercase tracking-[0.18em] text-oro-dark">Corporación VTR</p>
             </div>
@@ -461,7 +538,7 @@ export default function PlanosPage() {
                     {fmt(W)} × {fmt(H)} cm
                   </td>
                 </tr>
-              ) : (
+              ) : modo === "milano" ? (
                 <>
                   <tr>
                     <td className="pr-2 font-semibold text-[#6a6a60]">Puerta</td>
@@ -476,6 +553,13 @@ export default function PlanosPage() {
                     </td>
                   </tr>
                 </>
+              ) : (
+                <tr>
+                  <td className="pr-2 font-semibold text-[#6a6a60]">Puerta</td>
+                  <td className="tabular">
+                    {fmt(sola.puerta.ancho)} × {fmt(sola.puerta.alto)} cm
+                  </td>
+                </tr>
               )}
               {cliente && (
                 <tr>
@@ -507,6 +591,18 @@ export default function PlanosPage() {
 }
 
 // ---- mini componentes de UI (locales) ----
+function Avisos({ lista }: { lista: string[] }) {
+  if (lista.length === 0) return null;
+  return (
+    <div className="mt-1 flex flex-col gap-1 rounded-[4px] border border-oro-dark/30 bg-oro-dark/10 p-2">
+      {lista.map((a, i) => (
+        <p key={i} className="text-[11px] leading-snug text-oro-dark">
+          ⚠ {a}
+        </p>
+      ))}
+    </div>
+  );
+}
 function NumBadge({ n, size = 18 }: { n: number; size?: number }) {
   return (
     <span

@@ -20,17 +20,20 @@ export function matVoltear(t: DefTaca): string {
   return `matrix(-1,0,0,1,${t.ancho},0)`;
 }
 
-/** Canónico → pieza (cm), según el borde y la distancia de la esquina al inicio. */
-export function matBorde(borde: Borde, dist: number, W: number, H: number): string {
+/** Canónico → pieza (cm), según el borde y la distancia de la esquina al inicio.
+ *  Con `desdeFin` la dist se mide desde el OTRO extremo del borde (arriba en los
+ *  verticales, derecha en los horizontales) y la taca entra hacia la esquina base;
+ *  el anclaje queda en el extremo medido, así el boost visual no miente la cota. */
+export function matBorde(borde: Borde, dist: number, W: number, H: number, desdeFin = false): string {
   switch (borde) {
     case "inf":
-      return `matrix(1,0,0,1,${dist},0)`;
+      return desdeFin ? `matrix(-1,0,0,1,${W - dist},0)` : `matrix(1,0,0,1,${dist},0)`;
     case "sup":
-      return `matrix(1,0,0,-1,${dist},${H})`;
+      return desdeFin ? `matrix(-1,0,0,-1,${W - dist},${H})` : `matrix(1,0,0,-1,${dist},${H})`;
     case "izq":
-      return `matrix(0,1,1,0,0,${dist})`;
+      return desdeFin ? `matrix(0,-1,1,0,0,${H - dist})` : `matrix(0,1,1,0,0,${dist})`;
     case "der":
-      return `matrix(0,1,-1,0,${W},${dist})`;
+      return desdeFin ? `matrix(0,-1,-1,0,${W},${H - dist})` : `matrix(0,1,-1,0,${W},${dist})`;
   }
 }
 
@@ -45,8 +48,9 @@ export function transformTaca(
   W: number,
   H: number,
   escala = 1,
+  desdeFin = false,
 ): string {
-  const partes = [matBorde(borde, dist, W, H)];
+  const partes = [matBorde(borde, dist, W, H, desdeFin)];
   if (escala !== 1) partes.push(`matrix(${escala},0,0,${escala},0,0)`);
   if (voltear) partes.push(matVoltear(t));
   partes.push(matNativoACanonico(t));
@@ -80,21 +84,23 @@ export function transformTacaEsquina(
   return partes.join(" ");
 }
 
-/** Extremos de la cota de una taca (esquina → inicio), en pieza cm. */
+/** Extremos de la cota de una taca (esquina → inicio), en pieza cm.
+ *  Con `desdeFin` la cota sale de la esquina opuesta del borde. */
 export function cotaTaca(
   borde: Borde,
   dist: number,
   W: number,
   H: number,
+  desdeFin = false,
 ): { a: [number, number]; b: [number, number] } {
   switch (borde) {
     case "inf":
-      return { a: [0, 0], b: [dist, 0] };
+      return desdeFin ? { a: [W, 0], b: [W - dist, 0] } : { a: [0, 0], b: [dist, 0] };
     case "sup":
-      return { a: [0, H], b: [dist, H] };
+      return desdeFin ? { a: [W, H], b: [W - dist, H] } : { a: [0, H], b: [dist, H] };
     case "izq":
-      return { a: [0, 0], b: [0, dist] };
+      return desdeFin ? { a: [0, H], b: [0, H - dist] } : { a: [0, 0], b: [0, dist] };
     case "der":
-      return { a: [W, 0], b: [W, dist] };
+      return desdeFin ? { a: [W, H], b: [W, H - dist] } : { a: [W, 0], b: [W, dist] };
   }
 }

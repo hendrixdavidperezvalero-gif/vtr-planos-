@@ -46,15 +46,23 @@ function boostTaca(anchoReal: number, m: number): number {
 // Huella dibujada de una taca sobre su borde. `voltear` no entra: espeja la forma
 // dentro de su propio tramo, no lo mueve. Las tacas de esquina se apoyan siempre en un
 // borde horizontal (ver transformTacaEsquina), de ahí que `horizontal` las incluya.
-function huellaTaca(t: Taca, W: number, m: number) {
+function huellaTaca(t: Taca, W: number, H: number, m: number) {
   const def = TACAS[t.clave];
   const k = boostTaca(def.ancho, m);
   const largo = def.ancho * k; // tramo dibujado a lo largo del borde
   const fondo = ((def.nvb[1] * def.ancho) / def.nvb[0]) * k; // lo que entra al vidrio
   const horizontal = !!t.esquina || t.borde === "inf" || t.borde === "sup";
   const arriba = t.esquina ? t.esquina.startsWith("sup") : t.borde === "sup";
-  // centro del tramo a lo largo del borde (X si el borde es horizontal, Y si vertical)
-  const centro = t.esquina ? (t.esquina.endsWith("izq") ? largo / 2 : W - largo / 2) : t.dist + largo / 2;
+  // centro del tramo a lo largo del borde (X si el borde es horizontal, Y si vertical);
+  // con desdeFin la taca cuelga del otro extremo del borde
+  const L = horizontal ? W : H;
+  const centro = t.esquina
+    ? t.esquina.endsWith("izq")
+      ? largo / 2
+      : W - largo / 2
+    : t.desdeFin
+      ? L - t.dist - largo / 2
+      : t.dist + largo / 2;
   return { largo, fondo, horizontal, arriba, centro };
 }
 
@@ -74,11 +82,11 @@ function rotulosTacas(lista: Taca[], W: number, H: number, m: number, fs: number
   const gap = fs * 0.9;
   const paso = fs * 1.35; // separación entre rótulos apilados
 
-  const verticales = lista.filter((t) => !huellaTaca(t, W, m).horizontal);
-  const horizontales = lista.filter((t) => huellaTaca(t, W, m).horizontal);
+  const verticales = lista.filter((t) => !huellaTaca(t, W, H, m).horizontal);
+  const horizontales = lista.filter((t) => huellaTaca(t, W, H, m).horizontal);
 
   const rotVert = verticales.map((t) => {
-    const { fondo, centro } = huellaTaca(t, W, m);
+    const { fondo, centro } = huellaTaca(t, W, H, m);
     const izq = t.borde === "izq";
     return {
       id: t.id,
@@ -92,9 +100,9 @@ function rotulosTacas(lista: Taca[], W: number, H: number, m: number, fs: number
   // los horizontales se resuelven por borde: primero se centran y se encajan dentro
   // de la pieza, después se reparten niveles para que no se pisen entre sí
   const rotHoriz = (["inf", "sup"] as const).flatMap((lado) => {
-    const grupo = horizontales.filter((t) => huellaTaca(t, W, m).arriba === (lado === "sup"));
+    const grupo = horizontales.filter((t) => huellaTaca(t, W, H, m).arriba === (lado === "sup"));
     const cajas = grupo.map((t) => {
-      const { centro } = huellaTaca(t, W, m);
+      const { centro } = huellaTaca(t, W, H, m);
       const texto = TACAS[t.clave].nombre;
       const medio = anchoTexto(texto, fs) / 2;
       // si el rótulo es más ancho que la pieza no hay dónde encajarlo: se centra y ya
@@ -103,7 +111,7 @@ function rotulosTacas(lista: Taca[], W: number, H: number, m: number, fs: number
     });
     const { nivel } = nivelesSinSolape(cajas.map((c) => c.span));
     return cajas.map((c, i) => {
-      const { fondo } = huellaTaca(c.t, W, m);
+      const { fondo } = huellaTaca(c.t, W, H, m);
       const sep = fondo + gap + nivel[i] * paso;
       return {
         id: c.t.id,
@@ -339,7 +347,7 @@ function PiezaBloque({ ph, originX, padSup, m }: { ph: PiezaHoja; originX: numbe
     addHoriz(horizMap, ladoY, xRef, h.y, dx);
   });
   tacas.forEach((t) => {
-    const { a, b } = cotaTaca(t.borde, t.dist, W, H);
+    const { a, b } = cotaTaca(t.borde, t.dist, W, H, t.desdeFin);
     if (t.borde === "izq") addVert(vertMap, "izq", a[1], b[0], t.dist);
     else if (t.borde === "der") addVert(vertMap, "der", a[1], b[0], t.dist);
     else if (t.borde === "inf") addHoriz(horizMap, "inf", a[0], b[1], t.dist);
@@ -389,7 +397,7 @@ function PiezaBloque({ ph, originX, padSup, m }: { ph: PiezaHoja; originX: numbe
         {tacas.map((t) => {
           const def = TACAS[t.clave];
           const k = boostTaca(def.ancho, m);
-          const tr = transformTaca(def, t.borde, t.dist, t.voltear, W, H, k);
+          const tr = transformTaca(def, t.borde, t.dist, t.voltear, W, H, k, t.desdeFin);
           return (
             <g key={t.id} transform={tr}>
               <TacaPrimsHT clave={t.clave} />
