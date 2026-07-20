@@ -118,13 +118,14 @@ export function generarTodoVision(a: AjustesPuertaSola): { puerta: Pieza; avisos
   const esquinas: Esquina[] =
     a.manillon === "der" ? ["sup-izq", "inf-izq", "inf-der"] : ["sup-der", "inf-der", "inf-izq"];
   const els: Elemento[] = [
+    // voltear: así lo pidió Hendrix viendo el plano (espejo horizontal de la forma).
     ...esquinas.map<Elemento>((esquina, i) => ({
       id: i + 1,
       tipo: "taca",
       clave: "todovision",
       borde: "inf",
       dist: 0,
-      voltear: false,
+      voltear: true,
       esquina,
     })),
     ...perforacionesManillon(a, 4),
