@@ -54,15 +54,19 @@ function huellaTaca(t: Taca, W: number, H: number, m: number) {
   const horizontal = !!t.esquina || t.borde === "inf" || t.borde === "sup";
   const arriba = t.esquina ? t.esquina.startsWith("sup") : t.borde === "sup";
   // centro del tramo a lo largo del borde (X si el borde es horizontal, Y si vertical);
-  // con desdeFin la taca cuelga del otro extremo del borde
+  // con desdeFin la taca cuelga del otro extremo del borde, con alCentro dist YA es el centro
   const L = horizontal ? W : H;
   const centro = t.esquina
     ? t.esquina.endsWith("izq")
       ? largo / 2
       : W - largo / 2
-    : t.desdeFin
-      ? L - t.dist - largo / 2
-      : t.dist + largo / 2;
+    : t.alCentro
+      ? t.desdeFin
+        ? L - t.dist
+        : t.dist
+      : t.desdeFin
+        ? L - t.dist - largo / 2
+        : t.dist + largo / 2;
   return { largo, fondo, horizontal, arriba, centro };
 }
 
@@ -397,7 +401,7 @@ function PiezaBloque({ ph, originX, padSup, m }: { ph: PiezaHoja; originX: numbe
         {tacas.map((t) => {
           const def = TACAS[t.clave];
           const k = boostTaca(def.ancho, m);
-          const tr = transformTaca(def, t.borde, t.dist, t.voltear, W, H, k, t.desdeFin);
+          const tr = transformTaca(def, t.borde, t.dist, t.voltear, W, H, k, t.desdeFin, t.alCentro);
           return (
             <g key={t.id} transform={tr}>
               <TacaPrimsHT clave={t.clave} />

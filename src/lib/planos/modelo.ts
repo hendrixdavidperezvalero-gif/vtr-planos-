@@ -50,6 +50,8 @@ export interface Taca {
   desdeFin?: boolean; // dist medida desde el OTRO extremo del borde (arriba en bordes
   // verticales, derecha en horizontales): la cota sale de esa esquina — así una
   // bisagra "a 20 del tope" cota 20 y no (alto − 20 − taca).
+  alCentro?: boolean; // dist medida al CENTRO de la taca (no al inicio): la cota
+  // apunta al medio y el boost visual se ancla ahí — regla de las bisagras batiente.
 }
 
 export type Elemento = Perforacion | Taca;

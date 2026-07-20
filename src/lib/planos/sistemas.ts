@@ -88,7 +88,7 @@ export const PUERTA_SOLA = {
   centroFijo: 110, // pasado el tope, el centro se queda aquí
   sepManillon: 10, // cm del eje del manillón al borde de su lado
   diaManillon: 15, // Ø mm de cada perforación del manillón
-  sepBisagra: 20, // cm de cada bisagra (batiente) al borde horizontal más cercano
+  sepBisagra: 20, // cm del CENTRO de cada bisagra (batiente) al borde horizontal más cercano
 };
 
 function perforacionesManillon(a: AjustesPuertaSola, desdeId: number): Perforacion[] {
@@ -133,13 +133,14 @@ export function generarTodoVision(a: AjustesPuertaSola): { puerta: Pieza; avisos
   return { puerta: { ancho: a.ancho, alto: a.alto, elementos: els }, avisos: avisosPuertaSola(a) };
 }
 
-/** BATIENTE: 2 tacas de bisagra pegadas al borde contrario al manillón, cada una a
- *  20 cm de su borde horizontal más cercano (la de arriba cota desde arriba) + manillón. */
+/** BATIENTE: 2 tacas de bisagra pegadas al borde contrario al manillón, cada una con
+ *  su CENTRO a 20 cm del borde horizontal más cercano (la de arriba cota desde
+ *  arriba) + manillón. */
 export function generarBatiente(a: AjustesPuertaSola): { puerta: Pieza; avisos: string[] } {
   const bordeBisagras = a.manillon === "der" ? "izq" : "der";
   const els: Elemento[] = [
-    { id: 1, tipo: "taca", clave: "bisagra", borde: bordeBisagras, dist: PUERTA_SOLA.sepBisagra, voltear: false, desdeFin: true },
-    { id: 2, tipo: "taca", clave: "bisagra", borde: bordeBisagras, dist: PUERTA_SOLA.sepBisagra, voltear: false },
+    { id: 1, tipo: "taca", clave: "bisagra", borde: bordeBisagras, dist: PUERTA_SOLA.sepBisagra, voltear: false, desdeFin: true, alCentro: true },
+    { id: 2, tipo: "taca", clave: "bisagra", borde: bordeBisagras, dist: PUERTA_SOLA.sepBisagra, voltear: false, alCentro: true },
     ...perforacionesManillon(a, 3),
   ];
   return { puerta: { ancho: a.ancho, alto: a.alto, elementos: els }, avisos: avisosPuertaSola(a) };

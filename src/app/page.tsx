@@ -217,7 +217,7 @@ export default function PlanosPage() {
       ? `X ${fmt(e.x)} · Y ${fmt(e.y)} cm`
       : e.esquina
         ? `esquina ${ESQUINAS.find((q) => q.valor === e.esquina)!.nombre.toLowerCase()}${e.voltear ? " · volteada" : ""}`
-        : `borde ${bordeNombre(e.borde)} · inicio a ${fmt(e.dist)} cm${
+        : `borde ${bordeNombre(e.borde)} · ${e.alCentro ? "centro" : "inicio"} a ${fmt(e.dist)} cm${
             e.desdeFin ? (e.borde === "izq" || e.borde === "der" ? " desde arriba" : " desde la derecha") : ""
           }${e.voltear ? " · volteada" : ""}`;
 

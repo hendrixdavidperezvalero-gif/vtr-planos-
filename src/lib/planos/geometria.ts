@@ -49,9 +49,13 @@ export function transformTaca(
   H: number,
   escala = 1,
   desdeFin = false,
+  alCentro = false,
 ): string {
-  const partes = [matBorde(borde, dist, W, H, desdeFin)];
-  if (escala !== 1) partes.push(`matrix(${escala},0,0,${escala},0,0)`);
+  // alCentro: dist apunta al CENTRO de la taca — el inicio real queda medio ancho
+  // antes, y el boost se ancla al centro para que la cota siga siendo cierta.
+  const d0 = alCentro ? dist - t.ancho / 2 : dist;
+  const partes = [matBorde(borde, d0, W, H, desdeFin)];
+  if (escala !== 1) partes.push(`matrix(${escala},0,0,${escala},${alCentro ? -((escala - 1) * t.ancho) / 2 : 0},0)`);
   if (voltear) partes.push(matVoltear(t));
   partes.push(matNativoACanonico(t));
   return partes.join(" ");
