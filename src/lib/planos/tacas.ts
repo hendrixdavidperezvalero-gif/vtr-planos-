@@ -14,6 +14,8 @@ export const TACAS: Record<TacaClave, DefTaca> = {
     ancho: 2.8,
     nvb: [147, 112],
     esquina: false,
+    escalaVisual: 0.5, // Hendrix 2026-07-21: dibujado un 50% más pequeño
+
     prims: [
       {
         t: "path",

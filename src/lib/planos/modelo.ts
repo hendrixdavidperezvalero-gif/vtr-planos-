@@ -87,4 +87,5 @@ export interface DefTaca {
   nvb: [number, number];  // ancho, alto nativos del SVG (px de Figma)
   esquina: boolean;       // va en una esquina (dist ~ 0)
   prims: Primitiva[];     // trazos en coords nativas
+  escalaVisual?: number;  // factor del tamaño DIBUJADO (solo visual, no toca cotas)
 }

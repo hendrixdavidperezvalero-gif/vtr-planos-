@@ -9,7 +9,7 @@
 // la geometría; los textos y cotas viven FUERA de ese flip (usan `map`) para no
 // salir espejados.
 
-import type { Borde, Perforacion, Pieza, Taca, TacaClave } from "@/lib/planos/modelo";
+import type { Borde, DefTaca, Perforacion, Pieza, Taca, TacaClave } from "@/lib/planos/modelo";
 import { TACAS } from "@/lib/planos/tacas";
 import { cotaTaca, transformTaca, transformTacaEsquina } from "@/lib/planos/geometria";
 
@@ -38,9 +38,10 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 const MAX_ALTO_HOJA = "8.9in";
 
 // Factor de agrandado visual de una taca: garantiza un ancho dibujado mínimo relativo
-// a la pieza, sin tocar la cota real.
-function boostTaca(anchoReal: number, m: number): number {
-  return Math.max(1, (m * 0.09) / anchoReal);
+// a la pieza, sin tocar la cota real. `escalaVisual` de la taca lo modula (el clip
+// se dibuja a la mitad).
+function boostTaca(def: DefTaca, m: number): number {
+  return Math.max(1, (m * 0.09 * (def.escalaVisual ?? 1)) / def.ancho);
 }
 
 // Huella dibujada de una taca sobre su borde. `voltear` no entra: espeja la forma
@@ -48,7 +49,7 @@ function boostTaca(anchoReal: number, m: number): number {
 // borde horizontal (ver transformTacaEsquina), de ahí que `horizontal` las incluya.
 function huellaTaca(t: Taca, W: number, H: number, m: number) {
   const def = TACAS[t.clave];
-  const k = boostTaca(def.ancho, m);
+  const k = boostTaca(def, m);
   const largo = def.ancho * k; // tramo dibujado a lo largo del borde
   const fondo = ((def.nvb[1] * def.ancho) / def.nvb[0]) * k; // lo que entra al vidrio
   const horizontal = !!t.esquina || t.borde === "inf" || t.borde === "sup";
@@ -410,7 +411,7 @@ function PiezaBloque({ ph, originX, padSup, m }: { ph: PiezaHoja; originX: numbe
 
         {tacasEsquina.map((t) => {
           const def = TACAS[t.clave];
-          const k = boostTaca(def.ancho, m);
+          const k = boostTaca(def, m);
           const tr = transformTacaEsquina(def, t.esquina!, W, H, k, t.voltear);
           return (
             <g key={t.id} transform={tr}>
@@ -420,7 +421,7 @@ function PiezaBloque({ ph, originX, padSup, m }: { ph: PiezaHoja; originX: numbe
         })}
         {tacas.map((t) => {
           const def = TACAS[t.clave];
-          const k = boostTaca(def.ancho, m);
+          const k = boostTaca(def, m);
           const tr = transformTaca(def, t.borde, t.dist, t.voltear, W, H, k, t.desdeFin, t.alCentro);
           return (
             <g key={t.id} transform={tr}>
