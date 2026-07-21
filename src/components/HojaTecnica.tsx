@@ -127,7 +127,27 @@ function rotulosTacas(lista: Taca[], W: number, H: number, m: number, fs: number
     });
   });
 
-  return [...rotVert, ...rotHoriz];
+  // Pase final anti-solape ENTRE grupos (un rótulo de borde vertical puede caer sobre
+  // los de un borde horizontal, p. ej. clips en la esquina del fijo del toallero):
+  // cada rótulo que pisa a uno ya colocado se corre hacia el interior de la pieza.
+  const todos = [...rotVert, ...rotHoriz];
+  const colocados: { sp: [number, number]; y: number }[] = [];
+  const altoTxt = fs * 1.3;
+  for (const r of todos) {
+    const w = anchoTexto(r.texto, fs);
+    const x0 = r.anchor === "start" ? r.x : r.anchor === "end" ? r.x - w : r.x - w / 2;
+    const sp: [number, number] = [x0, x0 + w];
+    const dir = r.y < H / 2 ? 1 : -1;
+    let guard = 0;
+    while (
+      colocados.some((c) => sp[0] < c.sp[1] && c.sp[0] < sp[1] && Math.abs(c.y - r.y) < altoTxt) &&
+      guard++ < 12
+    ) {
+      r.y += dir * fs * 1.35;
+    }
+    colocados.push({ sp, y: r.y });
+  }
+  return todos;
 }
 
 /** Trazos de una taca (coords nativas), variante de estilo "hoja técnica". */
@@ -410,12 +430,26 @@ function PiezaBloque({ ph, originX, padSup, m }: { ph: PiezaHoja; originX: numbe
         })}
       </g>
 
-      {/* título al centro (sin número: se confunde con la cantidad de piezas) */}
-      {titulo && (
-        <text className="ht-titulo" x={W / 2} y={H / 2} textAnchor="middle" dominantBaseline="central" fontSize={fsTitulo}>
-          {titulo.toUpperCase()}
-        </text>
-      )}
+      {/* título al centro (sin número: se confunde con la cantidad de piezas); si hay
+          perforaciones justo a media altura (toallero), el título se corre para no pisarlas */}
+      {titulo &&
+        (() => {
+          // franja horizontal del título (con holgura para las etiquetas Ø de los agujeros)
+          const medioTxt = anchoTexto(titulo.toUpperCase(), fsTitulo) / 2 + fsTitulo * 4;
+          const choca = (yy: number) =>
+            perfs.some((h) => Math.abs(h.y - yy) < fsTitulo * 1.5 && Math.abs(h.x - W / 2) < medioTxt);
+          let yT = H / 2;
+          if (choca(yT)) {
+            if (!choca(H / 2 - fsTitulo * 2.4)) yT = H / 2 - fsTitulo * 2.4;
+            else if (!choca(H / 2 + fsTitulo * 2.4)) yT = H / 2 + fsTitulo * 2.4;
+          }
+          const [tx, ty] = map(W / 2, yT);
+          return (
+            <text className="ht-titulo" x={tx} y={ty} textAnchor="middle" dominantBaseline="central" fontSize={fsTitulo}>
+              {titulo.toUpperCase()}
+            </text>
+          );
+        })()}
 
       {/* cotas de perforaciones y tacas, apiladas por margen (nivel = sin solape de tramos) */}
       {izqList.map((e, i) => dimVert(`iz${i}`, "izq", e.yRef, e.valor, e.puntos, OFF0 + izqNiv.nivel[i] * OFFSTEP, W, H, m, fsDim, map))}

@@ -19,7 +19,7 @@ import type { Borde, Elemento, Esquina, Pieza, TacaClave } from "@/lib/planos/mo
 import { TACAS, TACAS_LISTA } from "@/lib/planos/tacas";
 import { HojaTecnica } from "@/components/HojaTecnica";
 import type { PiezaHoja } from "@/components/HojaTecnica";
-import { generarBatiente, generarMilano, generarTodoVision } from "@/lib/planos/sistemas";
+import { generarBatiente, generarMilano, generarToallero, generarTodoVision } from "@/lib/planos/sistemas";
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
@@ -34,13 +34,14 @@ const EJEMPLO: Elemento[] = [
   { id: 6, tipo: "perforacion", dia: 8, x: 65, y: 200 },
 ];
 
-type Modo = "libre" | "milano" | "todovision" | "batiente";
+type Modo = "libre" | "milano" | "todovision" | "batiente" | "toallero";
 
 // Nombre del sistema en el encabezado de impresión.
 const NOMBRE_SISTEMA: Record<Exclude<Modo, "libre">, string> = {
   milano: "Sistema MILANO",
   todovision: "Todo Visión con cerradura",
   batiente: "Puerta batiente",
+  toallero: "Puerta toallero",
 };
 
 // ---- Página ----
@@ -76,6 +77,14 @@ export default function PlanosPage() {
   const [altoSolaTxt, setAltoSolaTxt] = useState("210");
   const [largoManillonTxt, setLargoManillonTxt] = useState("30");
 
+  // puerta toallero (puerta izquierda + panel fijo derecha) — cada pieza con sus medidas.
+  const [anchoFijoToaTxt, setAnchoFijoToaTxt] = useState("65");
+  const [altoFijoToaTxt, setAltoFijoToaTxt] = useState("210");
+  const [anchoPuertaToaTxt, setAnchoPuertaToaTxt] = useState("65");
+  const [altoPuertaToaTxt, setAltoPuertaToaTxt] = useState("209");
+  const [anchoToalleroTxt, setAnchoToalleroTxt] = useState("45");
+  const [sepExtraTxt, setSepExtraTxt] = useState("15");
+
   const idRef = useRef(100);
   const escenaRef = useRef<HTMLDivElement>(null);
   const impresionRef = useRef<HTMLDivElement>(null);
@@ -93,6 +102,12 @@ export default function PlanosPage() {
     setAltoFijoTxt(v);
     const n = parseFloat(v);
     if (!Number.isNaN(n)) setAltoPuertaTxt(String(n - 1));
+  }
+  // Misma regla en toallero (estados propios).
+  function onAltoFijoToaChange(v: string) {
+    setAltoFijoToaTxt(v);
+    const n = parseFloat(v);
+    if (!Number.isNaN(n)) setAltoPuertaToaTxt(String(n - 1));
   }
 
   const anchoFijo = Math.max(5, parseFloat(anchoFijoTxt) || 80);
@@ -118,6 +133,25 @@ export default function PlanosPage() {
     [modo, anchoSola, altoSola, manillon, largoManillon],
   );
 
+  const anchoFijoToa = Math.max(5, parseFloat(anchoFijoToaTxt) || 65);
+  const altoFijoToa = Math.max(5, parseFloat(altoFijoToaTxt) || 210);
+  const anchoPuertaToa = Math.max(5, parseFloat(anchoPuertaToaTxt) || 65);
+  const altoPuertaToa = Math.max(5, parseFloat(altoPuertaToaTxt) || 209);
+  const anchoToallero = Math.max(1, parseFloat(anchoToalleroTxt) || 45);
+  const sepExtra = Math.max(0, parseFloat(sepExtraTxt) || 15);
+  const toallero = useMemo(
+    () =>
+      generarToallero({
+        anchoPuerta: anchoPuertaToa,
+        altoPuerta: altoPuertaToa,
+        anchoFijo: anchoFijoToa,
+        altoFijo: altoFijoToa,
+        anchoToallero,
+        sepExtra,
+      }),
+    [anchoPuertaToa, altoPuertaToa, anchoFijoToa, altoFijoToa, anchoToallero, sepExtra],
+  );
+
   // Todos los modos entregan la MISMA hoja de taller: piezas lado a lado, cada elemento
   // rotulado sobre el plano (Ø en su agujero, nombre en su taca) y sin pie de notas —
   // los datos del cliente y de la pieza van en el encabezado de impresión.
@@ -127,9 +161,14 @@ export default function PlanosPage() {
           { pieza: milano.puerta, titulo: "PUERTA" },
           { pieza: milano.fijo, titulo: "PANEL FIJO" },
         ]
-      : modo === "libre"
-        ? [{ pieza, titulo: descripcion || undefined }]
-        : [{ pieza: sola.puerta, titulo: "PUERTA" }];
+      : modo === "toallero"
+        ? [
+            { pieza: toallero.puerta, titulo: "PUERTA" },
+            { pieza: toallero.fijo, titulo: "PANEL FIJO" },
+          ]
+        : modo === "libre"
+          ? [{ pieza, titulo: descripcion || undefined }]
+          : [{ pieza: sola.puerta, titulo: "PUERTA" }];
 
   function agregar() {
     const [k, v] = tipoSel.split(":");
@@ -199,9 +238,11 @@ export default function PlanosPage() {
         const nombre =
           modo === "milano"
             ? `plano-milano-${fmt(anchoFijo)}x${fmt(altoFijo)}.png`
-            : modo === "libre"
-              ? `plano-${fmt(W)}x${fmt(H)}.png`
-              : `plano-${modo}-${fmt(anchoSola)}x${fmt(altoSola)}.png`;
+            : modo === "toallero"
+              ? `plano-toallero-${fmt(anchoFijoToa)}x${fmt(altoFijoToa)}.png`
+              : modo === "libre"
+                ? `plano-${fmt(W)}x${fmt(H)}.png`
+                : `plano-${modo}-${fmt(anchoSola)}x${fmt(altoSola)}.png`;
         descargar(u, nombre);
         URL.revokeObjectURL(u);
       }, "image/png");
@@ -251,6 +292,9 @@ export default function PlanosPage() {
               </ModoTab>
               <ModoTab active={modo === "batiente"} onClick={() => setModo("batiente")}>
                 Batiente
+              </ModoTab>
+              <ModoTab active={modo === "toallero"} onClick={() => setModo("toallero")}>
+                Toallero
               </ModoTab>
             </div>
 
@@ -322,6 +366,44 @@ export default function PlanosPage() {
                     : " 3 tacas todo visión en esquina; la del lado del manillón hace de cerradura."}
                 </p>
                 <Avisos lista={sola.avisos} />
+              </Seccion>
+            )}
+
+            {modo === "toallero" && (
+              <Seccion titulo="Puerta toallero">
+                <b className="block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6a6a60]">Panel fijo (derecha)</b>
+                <div className="flex gap-2">
+                  <Campo label="Ancho fijo (cm)">
+                    <NumInput value={anchoFijoToaTxt} onChange={setAnchoFijoToaTxt} />
+                  </Campo>
+                  <Campo label="Alto fijo (cm)">
+                    <NumInput value={altoFijoToaTxt} onChange={onAltoFijoToaChange} />
+                  </Campo>
+                </div>
+                <b className="mt-1 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6a6a60]">Puerta (izquierda)</b>
+                <div className="flex gap-2">
+                  <Campo label="Ancho puerta (cm)">
+                    <NumInput value={anchoPuertaToaTxt} onChange={setAnchoPuertaToaTxt} />
+                  </Campo>
+                  <Campo label="Alto puerta (cm)">
+                    <NumInput value={altoPuertaToaTxt} onChange={setAltoPuertaToaTxt} />
+                  </Campo>
+                </div>
+                <b className="mt-1 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#6a6a60]">Toallero</b>
+                <div className="flex gap-2">
+                  <Campo label="Ancho toallero (cm)">
+                    <NumInput value={anchoToalleroTxt} onChange={setAnchoToalleroTxt} />
+                  </Campo>
+                  <Campo label="Perf. extra a (cm)">
+                    <NumInput value={sepExtraTxt} onChange={setSepExtraTxt} />
+                  </Campo>
+                </div>
+                <p className="text-[11px] leading-snug text-[#8a8a80]">
+                  Toallero: 3 perforaciones Ø15 — centrado si el margen a cada lado da 10 cm o menos; si da más, se fija
+                  a 10 cm del borde derecho. Altura a mitad de la pieza (fijo a 110 si pasa de 220) y la perforación
+                  derecha lleva otra más arriba. Bisagras y clips con centro a 20 cm de su borde.
+                </p>
+                <Avisos lista={toallero.avisos} />
               </Seccion>
             )}
 
@@ -538,28 +620,17 @@ export default function PlanosPage() {
                     {fmt(W)} × {fmt(H)} cm
                   </td>
                 </tr>
-              ) : modo === "milano" ? (
-                <>
-                  <tr>
-                    <td className="pr-2 font-semibold text-[#6a6a60]">Puerta</td>
-                    <td className="tabular">
-                      {fmt(milano.puerta.ancho)} × {fmt(milano.puerta.alto)} cm
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="pr-2 font-semibold text-[#6a6a60]">Panel fijo</td>
-                    <td className="tabular">
-                      {fmt(milano.fijo.ancho)} × {fmt(milano.fijo.alto)} cm
-                    </td>
-                  </tr>
-                </>
               ) : (
-                <tr>
-                  <td className="pr-2 font-semibold text-[#6a6a60]">Puerta</td>
-                  <td className="tabular">
-                    {fmt(sola.puerta.ancho)} × {fmt(sola.puerta.alto)} cm
-                  </td>
-                </tr>
+                piezasHoja.map(({ pieza: pz, titulo }) => (
+                  <tr key={titulo}>
+                    <td className="pr-2 font-semibold text-[#6a6a60]">
+                      {titulo!.charAt(0) + titulo!.slice(1).toLowerCase()}
+                    </td>
+                    <td className="tabular">
+                      {fmt(pz.ancho)} × {fmt(pz.alto)} cm
+                    </td>
+                  </tr>
+                ))
               )}
               {cliente && (
                 <tr>

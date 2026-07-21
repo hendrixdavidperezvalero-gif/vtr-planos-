@@ -91,8 +91,13 @@ export const PUERTA_SOLA = {
   sepBisagra: 20, // cm del CENTRO de cada bisagra (batiente) al borde horizontal más cercano
 };
 
+/** Altura del herraje central (manillón / toallero): mitad del alto, fijo a 110 si la pieza pasa de 220. */
+function centroAltura(alto: number): number {
+  return alto <= PUERTA_SOLA.topeCentro ? alto / 2 : PUERTA_SOLA.centroFijo;
+}
+
 function perforacionesManillon(a: AjustesPuertaSola, desdeId: number): Perforacion[] {
-  const centro = a.alto <= PUERTA_SOLA.topeCentro ? a.alto / 2 : PUERTA_SOLA.centroFijo;
+  const centro = centroAltura(a.alto);
   const x = a.manillon === "der" ? a.ancho - PUERTA_SOLA.sepManillon : PUERTA_SOLA.sepManillon;
   const medio = a.largoManillon / 2;
   return [
@@ -104,7 +109,7 @@ function perforacionesManillon(a: AjustesPuertaSola, desdeId: number): Perforaci
 function avisosPuertaSola(a: AjustesPuertaSola): string[] {
   const avisos: string[] = [];
   if (a.alto !== PUERTA_SOLA.alto) avisos.push(`El alto de la puerta no es ${PUERTA_SOLA.alto} cm`);
-  const centro = a.alto <= PUERTA_SOLA.topeCentro ? a.alto / 2 : PUERTA_SOLA.centroFijo;
+  const centro = centroAltura(a.alto);
   if (centro - a.largoManillon / 2 < 0 || centro + a.largoManillon / 2 > a.alto) {
     avisos.push("El manillón no cabe: sus perforaciones caen fuera de la pieza");
   }
@@ -131,6 +136,73 @@ export function generarTodoVision(a: AjustesPuertaSola): { puerta: Pieza; avisos
     ...perforacionesManillon(a, 4),
   ];
   return { puerta: { ancho: a.ancho, alto: a.alto, elementos: els }, avisos: avisosPuertaSola(a) };
+}
+
+// ---- PUERTA TOALLERO: puerta (izquierda) + panel fijo (DERECHA) ----
+// Reglas de taller (Hendrix, 2026-07-21). La puerta lleva 2 bisagras al borde
+// izquierdo (centro a 20 del tope y del piso) y un TOALLERO de 3 perforaciones Ø15:
+// margen = (ancho − toallero) / 2 a cada lado, pero si da más de 10 el toallero se
+// fija a 10 cm del borde derecho; altura por centroAltura, y la perforación derecha
+// lleva otra 15 cm (editable) más arriba. Fijo: 4 clips con centro a 20 cm — 2 en el
+// piso (uno de cada lateral) y 2 en el borde izquierdo (piso y techo). Alto estándar
+// fijo 210 / puerta 209 (puerta = fijo − 1, igual que MILANO).
+
+export interface AjustesToallero {
+  anchoPuerta: number; // cm
+  altoPuerta: number; // cm
+  anchoFijo: number; // cm
+  altoFijo: number; // cm
+  anchoToallero: number; // cm — separación entre las 2 perforaciones del toallero
+  sepExtra: number; // cm — perforación extra sobre la derecha, estándar 15
+}
+
+export const TOALLERO = {
+  alto: 210, // alto estándar del fijo (la puerta va derivada: fijo − 1)
+  deltaPuerta: 1,
+  margenMax: 10, // margen máximo del toallero al borde; si da más, se fija a 10 de la derecha
+  dia: 15, // Ø mm de las 3 perforaciones
+  sep: 20, // cm del centro de bisagras y clips a su borde más cercano
+  anchoToallero: 45, // cm estándar
+  sepExtra: 15, // cm estándar de la perforación extra
+};
+
+/** Arma la puerta y el panel fijo del sistema PUERTA TOALLERO. */
+export function generarToallero(a: AjustesToallero): { puerta: Pieza; fijo: Pieza; avisos: string[] } {
+  const W = a.anchoPuerta,
+    H = a.altoPuerta;
+  const s = TOALLERO.sep;
+
+  const margen = (W - a.anchoToallero) / 2;
+  const xDer = margen > TOALLERO.margenMax ? W - TOALLERO.margenMax : W - margen;
+  const xIzq = xDer - a.anchoToallero;
+  const y = centroAltura(H);
+
+  const puertaEls: Elemento[] = [
+    { id: 1, tipo: "taca", clave: "bisagra", borde: "izq", dist: s, voltear: false, desdeFin: true, alCentro: true },
+    { id: 2, tipo: "taca", clave: "bisagra", borde: "izq", dist: s, voltear: false, alCentro: true },
+    { id: 3, tipo: "perforacion", dia: TOALLERO.dia, x: xIzq, y },
+    { id: 4, tipo: "perforacion", dia: TOALLERO.dia, x: xDer, y },
+    { id: 5, tipo: "perforacion", dia: TOALLERO.dia, x: xDer, y: y + a.sepExtra },
+  ];
+
+  const fijoEls: Elemento[] = [
+    { id: 1, tipo: "taca", clave: "clip", borde: "inf", dist: s, voltear: false, alCentro: true },
+    { id: 2, tipo: "taca", clave: "clip", borde: "inf", dist: s, voltear: false, desdeFin: true, alCentro: true },
+    { id: 3, tipo: "taca", clave: "clip", borde: "izq", dist: s, voltear: false, alCentro: true },
+    { id: 4, tipo: "taca", clave: "clip", borde: "izq", dist: s, voltear: false, desdeFin: true, alCentro: true },
+  ];
+
+  const avisos: string[] = [];
+  if (a.altoFijo !== TOALLERO.alto) avisos.push(`El alto del panel fijo no es ${TOALLERO.alto} cm`);
+  if (H !== a.altoFijo - TOALLERO.deltaPuerta) avisos.push("La puerta suele medir 1 cm menos de alto que el fijo");
+  if (margen < 0) avisos.push("El toallero es más ancho que la puerta");
+  if (y + a.sepExtra > H) avisos.push("La perforación extra del toallero se sale de la pieza");
+
+  return {
+    puerta: { ancho: W, alto: H, elementos: puertaEls },
+    fijo: { ancho: a.anchoFijo, alto: a.altoFijo, elementos: fijoEls },
+    avisos,
+  };
 }
 
 /** BATIENTE: 2 tacas de bisagra pegadas al borde contrario al manillón, cada una con
